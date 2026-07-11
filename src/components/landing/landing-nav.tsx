@@ -4,7 +4,8 @@ import {
   Menu,
   UserPlus,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Sheet,
   SheetContent,

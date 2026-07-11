@@ -1,5 +1,5 @@
 import { ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react"
-import { buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 
 export function LandingHero() {
   return (
