@@ -29,7 +29,7 @@ const authCopy = {
     submitLabel: "Log in",
     footer: "New to PickleBuddzy?",
     footerHref: "/signup",
-    footerLink: "Start here",
+    footerLink: "Sign Up",
   },
   signup: {
     title: "Create your account",
@@ -60,7 +60,7 @@ export function AuthCard({ mode }: AuthCardProps) {
         <div className="absolute inset-0 bg-black/25" />
 
         {/* Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/30 to-primary/30" />
+        <div className="absolute inset-0 bg-linear-to-br from-black/70 via-black/30 to-primary/30" />
 
         {/* Glow */}
         <div className="absolute -left-32 top-24 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
@@ -135,14 +135,9 @@ export function AuthCard({ mode }: AuthCardProps) {
 
       <section className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
         <Card className="w-full max-w-md rounded-lg">
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle className="text-xl">{copy.title}</CardTitle>
             <CardDescription>{copy.description}</CardDescription>
-            <CardAction>
-              <a className={cn(buttonVariants({ variant: "link" }), "px-0")} href={copy.actionHref}>
-                {copy.actionLabel}
-              </a>
-            </CardAction>
           </CardHeader>
 
           <CardContent>
@@ -191,6 +186,13 @@ export function AuthCard({ mode }: AuthCardProps) {
                 </div>
                 <Input id="password" type="password" required />
               </div>
+
+              {mode === "signup" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Input id="confirm-password" type="password" required />
+                </div>
+              )}
             </form>
           </CardContent>
 

@@ -15,6 +15,8 @@ const navLinks = [
   { label: "Home", href: "#" },
   { label: "Features", href: "#features" },
   { label: "Contact", href: "#contact" },
+  { label: "Pricing", href: "#pricing"},
+  { label: "About Us", href: "#about"}
 ];
 
 export function LandingNav() {
