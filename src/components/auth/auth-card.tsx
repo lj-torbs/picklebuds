@@ -195,7 +195,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           </CardContent>
 
           <CardFooter className="flex-col gap-3">
-            <Button className="w-full">{copy.submitLabel}</Button>
+            <Button className="w-full"><a href="/booking">{copy.submitLabel}</a></Button>
             <Button variant="outline" className="w-full">
               Continue with Google
             </Button>

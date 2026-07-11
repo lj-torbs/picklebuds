@@ -57,7 +57,7 @@ export function LandingNav() {
           {/* Desktop Buttons */}
           <div className="hidden items-center gap-3 md:flex">
             <a
-              href="/login"
+              href="/booking"
               className={buttonVariants({
                 variant: "ghost",
                 size: "sm",
@@ -97,7 +97,7 @@ export function LandingNav() {
                   </a>
                 ))}
                 <hr className="my-2" />
-                <a href="/login" className={buttonVariants({ variant: "outline" })}>
+                <a href="/booking" className={buttonVariants({ variant: "outline" })}>
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
                 </a>
