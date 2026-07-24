@@ -1,11 +1,13 @@
 import {
   CalendarCheck,
+  LogOut,
   Mail,
   MapPin,
   Phone,
   ShieldCheck,
   UserRound,
 } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { buttonVariants } from "@/components/ui/button-variants"
@@ -18,13 +20,22 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useAuth } from "@/lib/auth-context"
 
 export function ProfilePage() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate("/login")
+  }
+
   return (
     <main className="min-h-svh bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <a href="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
@@ -32,10 +43,16 @@ export function ProfilePage() {
               <span className="block text-base font-bold leading-tight">PickleBuddy</span>
               <span className="block text-xs text-muted-foreground">Profile</span>
             </span>
-          </a>
-          <a href="/booking" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            Book court
-          </a>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/booking" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Book court
+            </Link>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="size-4" aria-hidden="true" />
+              Log out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -46,13 +63,13 @@ export function ProfilePage() {
               <span className="flex size-20 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                 <UserRound className="size-10" aria-hidden="true" />
               </span>
-              <CardTitle>Alex Morgan</CardTitle>
+              <CardTitle>{user?.name ?? "Player"}</CardTitle>
               <CardDescription>Client account</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
               <span className="inline-flex items-center gap-2 text-muted-foreground">
                 <Mail className="size-4" aria-hidden="true" />
-                alex@example.com
+                {user?.email ?? "you@example.com"}
               </span>
               <span className="inline-flex items-center gap-2 text-muted-foreground">
                 <Phone className="size-4" aria-hidden="true" />
@@ -86,11 +103,16 @@ export function ProfilePage() {
               <div className="grid gap-2 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="profile-name">Full name</Label>
-                  <Input id="profile-name" defaultValue="Alex Morgan" />
+                  <Input id="profile-name" key={user?.name} defaultValue={user?.name ?? ""} />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="profile-email">Email</Label>
-                  <Input id="profile-email" type="email" defaultValue="alex@example.com" />
+                  <Input
+                    id="profile-email"
+                    type="email"
+                    key={user?.email}
+                    defaultValue={user?.email ?? ""}
+                  />
                 </div>
               </div>
               <div className="grid gap-2 md:grid-cols-2">

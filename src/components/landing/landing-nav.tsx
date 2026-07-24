@@ -1,9 +1,9 @@
 import {
-  CalendarCheck,
   LogIn,
   Menu,
   UserPlus,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
@@ -25,9 +25,13 @@ export function LandingNav() {
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
-        <a href="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <CalendarCheck className="h-5 w-5" />
+        <Link to="/" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center">
+            <img
+              src="/images/pikolbudyfinal.svg"
+              alt="PickleBuddy Logo"
+              className="h-10 w-10"
+            />
           </div>
           <div className="leading-tight">
             <p className="font-bold tracking-tight text-lg">
@@ -37,7 +41,7 @@ export function LandingNav() {
               Smart Court Reservation
             </p>
           </div>
-        </a>
+        </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-8 md:flex">
@@ -56,8 +60,8 @@ export function LandingNav() {
         <div className="flex items-center gap-3">
           {/* Desktop Buttons */}
           <div className="hidden items-center gap-3 md:flex">
-            <a
-              href="/booking"
+            <Link
+              to="/booking"
               className={buttonVariants({
                 variant: "ghost",
                 size: "sm",
@@ -65,13 +69,13 @@ export function LandingNav() {
             >
               <LogIn className="mr-2 h-4 w-4" />
               Login
-            </a>
-            <a href="/signup">
+            </Link>
+            <Link to="/signup">
               <Button size="sm">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Register
               </Button>
-            </a>
+            </Link>
           </div>
 
           {/* Mobile Menu */}
@@ -97,14 +101,14 @@ export function LandingNav() {
                   </a>
                 ))}
                 <hr className="my-2" />
-                <a href="/booking" className={buttonVariants({ variant: "outline" })}>
+                <Link to="/booking" className={buttonVariants({ variant: "outline" })}>
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
-                </a>
-                <a href="/signup" className={buttonVariants({})}>
+                </Link>
+                <Link to="/signup" className={buttonVariants({})}>
                   <UserPlus className="mr-2 h-4 w-4" />
                   Register
-                </a>
+                </Link>
               </div>
             </SheetContent>
           </Sheet>

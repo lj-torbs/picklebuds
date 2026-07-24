@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import {
   Bell,
   CalendarCheck,
@@ -22,49 +23,10 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { DatePicker } from "@/components/ui/date-picker"
+import { useToast } from "@/components/ui/toast"
+import type { Booking, BookingStatus } from "@/lib/bookings-context"
+import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
-
-type BookingStatus = "confirmed" | "pending" | "completed" | "cancelled"
-
-type Booking = {
-  id: string
-  gym: string
-  address: string
-  court: string
-  date: string
-  slots: string[]
-  status: BookingStatus
-}
-
-const initialBookings: Booking[] = [
-  {
-    id: "PB-1042",
-    gym: "Northside Pickleball Gym",
-    address: "12 Greenway Avenue",
-    court: "Court B",
-    date: "2026-07-12",
-    slots: ["10:00 AM", "2:30 PM"],
-    status: "confirmed",
-  },
-  {
-    id: "PB-1043",
-    gym: "Central Court Club",
-    address: "204 Matchpoint Street",
-    court: "Court 2",
-    date: "2026-07-15",
-    slots: ["5:00 PM", "8:00 PM"],
-    status: "pending",
-  },
-  {
-    id: "PB-1019",
-    gym: "Riverside Sports Center",
-    address: "88 Rally Road",
-    court: "Main Court",
-    date: "2026-07-05",
-    slots: ["7:30 AM"],
-    status: "completed",
-  },
-]
 
 const rescheduleSlots = ["7:30 AM", "9:00 AM", "10:30 AM", "1:00 PM", "3:30 PM", "6:00 PM"]
 
@@ -76,7 +38,12 @@ const statusStyles: Record<BookingStatus, string> = {
 }
 
 export function MyBookingsPage() {
-  const [bookings, setBookings] = useState(initialBookings)
+  const {
+    bookings,
+    cancelBooking: cancelBookingInStore,
+    rescheduleBooking: rescheduleBookingInStore,
+  } = useBookings()
+  const toast = useToast()
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null)
   const [draftDate, setDraftDate] = useState("")
   const [draftSlots, setDraftSlots] = useState<string[]>([])
@@ -108,37 +75,32 @@ export function MyBookingsPage() {
       return
     }
 
-    setBookings((currentBookings) =>
-      currentBookings.map((booking) =>
-        booking.id === bookingId
-          ? {
-              ...booking,
-              date: draftDate,
-              slots: draftSlots,
-              status: "confirmed",
-            }
-          : booking
-      )
-    )
+    rescheduleBookingInStore(bookingId, draftDate, draftSlots)
     setEditingBookingId(null)
+    toast.add({
+      title: "Booking rescheduled",
+      description: `Updated to ${draftDate} · ${draftSlots.join(", ")}`,
+      type: "success",
+    })
   }
 
   function cancelBooking(bookingId: string) {
-    setBookings((currentBookings) =>
-      currentBookings.map((booking) =>
-        booking.id === bookingId ? { ...booking, status: "cancelled" } : booking
-      )
-    )
+    cancelBookingInStore(bookingId)
     if (editingBookingId === bookingId) {
       setEditingBookingId(null)
     }
+    toast.add({
+      title: "Booking cancelled",
+      description: `Booking ${bookingId} has been cancelled.`,
+      type: "success",
+    })
   }
 
   return (
     <main className="min-h-svh bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <a href="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
@@ -146,26 +108,26 @@ export function MyBookingsPage() {
               <span className="block text-base font-bold leading-tight">PickleBuddy</span>
               <span className="block text-xs text-muted-foreground">My bookings</span>
             </span>
-          </a>
+          </Link>
           <div className="flex items-center gap-2">
-            <a
-              href="/notifications"
+            <Link
+              to="/notifications"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
               aria-label="Notifications"
             >
               <Bell className="size-4" aria-hidden="true" />
-            </a>
-            <a
-              href="/profile"
+            </Link>
+            <Link
+              to="/profile"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
               aria-label="Profile"
             >
               <UserRound className="size-4" aria-hidden="true" />
-            </a>
-            <a href="/booking" className={buttonVariants({ size: "sm" })}>
+            </Link>
+            <Link to="/booking" className={buttonVariants({ size: "sm" })}>
               <Plus className="size-4" aria-hidden="true" />
               New booking
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -251,10 +213,10 @@ export function MyBookingsPage() {
                   {cancelledBookings.length}
                 </span>
               </div>
-              <a href="/booking" className={buttonVariants({ className: "w-full" })}>
+              <Link to="/booking" className={buttonVariants({ className: "w-full" })}>
                 <CalendarDays className="size-4" aria-hidden="true" />
                 Book another court
-              </a>
+              </Link>
             </CardContent>
           </Card>
         </aside>

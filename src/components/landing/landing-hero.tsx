@@ -1,4 +1,5 @@
 import { ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react"
+import { Link } from "react-router-dom"
 import { buttonVariants } from "@/components/ui/button-variants"
 
 export function LandingHero() {
@@ -23,10 +24,10 @@ export function LandingHero() {
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <a href="/signup" className={buttonVariants({ size: "lg" }) + " group shadow-md shadow-primary/20"}>
+            <Link to="/signup" className={buttonVariants({ size: "lg" }) + " group shadow-md shadow-primary/20"}>
               Start booking
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </a>
+            </Link>
           </div>
         </div>
 

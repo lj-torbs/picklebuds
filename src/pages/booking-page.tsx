@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Bell,
   CalendarCheck,
@@ -22,6 +23,8 @@ import {
 import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useToast } from "@/components/ui/toast"
+import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
 
 type Court = {
@@ -66,6 +69,20 @@ const gyms: Gym[] = [
       {
         id: "northside-c",
         name: "Court C",
+        surface: "Indoor premium",
+        capacity: "Training court",
+        availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
+      },
+      {
+        id: "northside-d",
+        name: "Court D",
+        surface: "Indoor premium",
+        capacity: "Training court",
+        availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
+      },
+      {
+        id: "northside-e",
+        name: "Court E",
         surface: "Indoor premium",
         capacity: "Training court",
         availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
@@ -118,6 +135,10 @@ function getTodayValue() {
 }
 
 export function BookingPage() {
+  const navigate = useNavigate()
+  const { addBooking, isSlotBooked } = useBookings()
+  const toast = useToast()
+
   const [selectedGymId, setSelectedGymId] = useState(gyms[0].id)
   const [selectedCourtId, setSelectedCourtId] = useState(gyms[0].courts[0].id)
   const [selectedDate, setSelectedDate] = useState(getTodayValue)
@@ -137,18 +158,48 @@ export function BookingPage() {
     [selectedCourtId, selectedGym]
   )
 
+  const bookedSlots = useMemo(
+    () =>
+      new Set(
+        selectedCourt.availableSlots.filter((slot) =>
+          isSlotBooked(selectedGym.id, selectedCourt.id, selectedDate, slot)
+        )
+      ),
+    [selectedGym.id, selectedCourt, selectedDate, isSlotBooked]
+  )
+
+  function pickFirstAvailableSlot(gym: Gym, court: Court, date: string) {
+    return court.availableSlots.find((slot) => !isSlotBooked(gym.id, court.id, date, slot))
+  }
+
   function handleGymChange(gym: Gym) {
+    const court = gym.courts[0]
     setSelectedGymId(gym.id)
-    setSelectedCourtId(gym.courts[0].id)
-    setSelectedSlots([gym.courts[0].availableSlots[0]])
+    setSelectedCourtId(court.id)
+    const firstAvailable = pickFirstAvailableSlot(gym, court, selectedDate)
+    setSelectedSlots(firstAvailable ? [firstAvailable] : [])
   }
 
   function handleCourtChange(court: Court) {
     setSelectedCourtId(court.id)
-    setSelectedSlots([court.availableSlots[0]])
+    const firstAvailable = pickFirstAvailableSlot(selectedGym, court, selectedDate)
+    setSelectedSlots(firstAvailable ? [firstAvailable] : [])
+  }
+
+  function handleDateChange(nextDate: string) {
+    setSelectedDate(nextDate)
+    setSelectedSlots((currentSlots) =>
+      currentSlots.filter(
+        (slot) => !isSlotBooked(selectedGym.id, selectedCourt.id, nextDate, slot)
+      )
+    )
   }
 
   function toggleSlot(slot: string) {
+    if (bookedSlots.has(slot)) {
+      return
+    }
+
     setSelectedSlots((currentSlots) => {
       if (currentSlots.includes(slot)) {
         return currentSlots.filter((currentSlot) => currentSlot !== slot)
@@ -158,11 +209,33 @@ export function BookingPage() {
     })
   }
 
+  function handleConfirmBooking() {
+    if (selectedSlots.length === 0) {
+      return
+    }
+
+    addBooking({
+      gymId: selectedGym.id,
+      gym: selectedGym.name,
+      address: selectedGym.address,
+      courtId: selectedCourt.id,
+      court: selectedCourt.name,
+      date: selectedDate,
+      slots: selectedSlots,
+    })
+    toast.add({
+      title: "Booking confirmed",
+      description: `${selectedCourt.name} at ${selectedGym.name} on ${selectedDate}`,
+      type: "success",
+    })
+    navigate("/my-bookings")
+  }
+
   return (
     <main className="min-h-svh bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <a href="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
@@ -170,28 +243,28 @@ export function BookingPage() {
               <span className="block text-base font-bold leading-tight">PickleBuddy</span>
               <span className="block text-xs text-muted-foreground">Client booking</span>
             </span>
-          </a>
+          </Link>
           <div className="flex items-center gap-2">
-            <a
-              href="/notifications"
+            <Link
+              to="/notifications"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
               aria-label="Notifications"
             >
               <Bell className="size-4" aria-hidden="true" />
-            </a>
-            <a
-              href="/profile"
+            </Link>
+            <Link
+              to="/profile"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
               aria-label="Profile"
             >
               <UserRound className="size-4" aria-hidden="true" />
-            </a>
-            <a
-              href="/my-bookings"
+            </Link>
+            <Link
+              to="/my-bookings"
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
               My bookings
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -306,23 +379,30 @@ export function BookingPage() {
               <DatePicker
                 id="booking-date"
                 value={selectedDate}
-                onChange={setSelectedDate}
+                onChange={handleDateChange}
               />
             </div>
 
             <div className="grid gap-3">
               <Label>Available time slots</Label>
               <div className="flex flex-wrap gap-2">
-                {selectedCourt.availableSlots.map((slot) => (
-                  <Button
-                    key={slot}
-                    type="button"
-                    variant={selectedSlots.includes(slot) ? "default" : "outline"}
-                    onClick={() => toggleSlot(slot)}
-                  >
-                    {slot}
-                  </Button>
-                ))}
+                {selectedCourt.availableSlots.map((slot) => {
+                  const isBooked = bookedSlots.has(slot)
+
+                  return (
+                    <Button
+                      key={slot}
+                      type="button"
+                      variant={selectedSlots.includes(slot) ? "default" : "outline"}
+                      onClick={() => toggleSlot(slot)}
+                      disabled={isBooked}
+                      title={isBooked ? "Already booked" : undefined}
+                    >
+                      {slot}
+                      {isBooked ? " (booked)" : ""}
+                    </Button>
+                  )
+                })}
               </div>
             </div>
           </section>
@@ -363,7 +443,11 @@ export function BookingPage() {
                   {selectedSlots.length > 0 ? selectedSlots.join(", ") : "No slots selected"}
                 </span>
               </div>
-              <Button className="w-full">
+              <Button
+                className="w-full"
+                onClick={handleConfirmBooking}
+                disabled={selectedSlots.length === 0}
+              >
                 <CalendarCheck className="size-4" aria-hidden="true" />
                 Confirm booking
               </Button>
@@ -374,6 +458,3 @@ export function BookingPage() {
     </main>
   )
 }
-
-
-//TODO codex resume 019f4f1a-1ddb-7043-a01f-ea89a92531a5

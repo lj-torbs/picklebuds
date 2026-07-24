@@ -1,6 +1,10 @@
+import { useState } from "react"
 import { CalendarCheck, Mail, UserRound } from "lucide-react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
+import type { z } from "zod"
 
 import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import {
   Card,
   CardContent,
@@ -11,8 +15,24 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useToast } from "@/components/ui/toast"
+import { useAuth } from "@/lib/auth-context"
+import { loginSchema, sanitizeEmail, sanitizeText, signupSchema } from "@/lib/validation"
 
 type AuthMode = "login" | "signup"
+
+function firstFieldErrors(error: z.ZodError): Record<string, string> {
+  const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>
+  const result: Record<string, string> = {}
+
+  for (const [field, messages] of Object.entries(fieldErrors)) {
+    if (messages && messages.length > 0) {
+      result[field] = messages[0]!
+    }
+  }
+
+  return result
+}
 
 type AuthCardProps = {
   mode: AuthMode
@@ -43,6 +63,78 @@ const authCopy = {
 
 export function AuthCard({ mode }: AuthCardProps) {
   const copy = authCopy[mode]
+  const { login, signup } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const toast = useToast()
+
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  function goToDestination() {
+    const state = location.state as { from?: { pathname?: string } } | null
+    navigate(state?.from?.pathname ?? "/booking", { replace: true })
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const sanitizedEmail = sanitizeEmail(email)
+
+    if (mode === "signup") {
+      const result = signupSchema.safeParse({
+        name: sanitizeText(name),
+        email: sanitizedEmail,
+        password,
+        confirmPassword,
+      })
+
+      if (!result.success) {
+        const errors = firstFieldErrors(result.error)
+        setFieldErrors(errors)
+        toast.add({
+          title: "Check your details",
+          description: Object.values(errors)[0] ?? "Some fields need attention.",
+          type: "error",
+        })
+        return
+      }
+
+      setFieldErrors({})
+      signup({ name: result.data.name, email: result.data.email, password: result.data.password })
+      toast.add({
+        title: "Account created",
+        description: `Welcome, ${result.data.name}!`,
+        type: "success",
+      })
+    } else {
+      const result = loginSchema.safeParse({ email: sanitizedEmail, password })
+
+      if (!result.success) {
+        const errors = firstFieldErrors(result.error)
+        setFieldErrors(errors)
+        toast.add({
+          title: "Check your details",
+          description: Object.values(errors)[0] ?? "Some fields need attention.",
+          type: "error",
+        })
+        return
+      }
+
+      setFieldErrors({})
+      login(result.data)
+      toast.add({
+        title: "Welcome back",
+        description: `Signed in as ${result.data.email}`,
+        type: "success",
+      })
+    }
+
+    goToDestination()
+  }
 
   return (
     <main className="flex min-h-svh bg-muted/40">
@@ -68,8 +160,8 @@ export function AuthCard({ mode }: AuthCardProps) {
         <div className="relative z-10 flex w-full flex-col justify-between p-10">
 
           {/* Logo */}
-          <a
-            href="/"
+          <Link
+            to="/"
             className="flex w-fit items-center gap-3"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-lg">
@@ -84,7 +176,7 @@ export function AuthCard({ mode }: AuthCardProps) {
                 Court Booking Platform
               </p>
             </div>
-          </a>
+          </Link>
 
           {/* Center Text */}
           <div className="max-w-xl">
@@ -139,7 +231,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           </CardHeader>
 
           <CardContent>
-            <form className="grid gap-5">
+            <form id="auth-form" className="grid gap-5" onSubmit={handleSubmit}>
               {mode === "signup" ? (
                 <div className="grid gap-2">
                   <Label htmlFor="name">Full name</Label>
@@ -148,8 +240,19 @@ export function AuthCard({ mode }: AuthCardProps) {
                       className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                       aria-hidden="true"
                     />
-                    <Input id="name" className="pl-8" placeholder="Alex Morgan" required />
+                    <Input
+                      id="name"
+                      className="pl-8"
+                      placeholder="Alex Morgan"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      aria-invalid={Boolean(fieldErrors.name)}
+                      required
+                    />
                   </div>
+                  {fieldErrors.name ? (
+                    <p className="text-sm text-destructive">{fieldErrors.name}</p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -162,48 +265,83 @@ export function AuthCard({ mode }: AuthCardProps) {
                   />
                   <Input
                     id="email"
-                    type="email"
+                    type="text"
+                    inputMode="email"
+                    autoComplete="email"
                     className="pl-8"
                     placeholder="you@example.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    aria-invalid={Boolean(fieldErrors.email)}
                     required
                   />
                 </div>
+                {fieldErrors.email ? (
+                  <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                ) : null}
               </div>
 
               <div className="grid gap-2">
                 <div className="flex items-center gap-3">
                   <Label htmlFor="password">Password</Label>
                   {mode === "login" ? (
-                    <a
-                      href="/forgot-password"
+                    <Link
+                      to="/forgot-password"
                       className="ml-auto text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                     >
                       Forgot password?
-                    </a>
+                    </Link>
                   ) : null}
                 </div>
-                <Input id="password" type="password" required />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  required
+                />
+                {mode === "signup" && !fieldErrors.password ? (
+                  <p className="text-xs text-muted-foreground">
+                    At least 8 characters, letters and numbers only.
+                  </p>
+                ) : null}
+                {fieldErrors.password ? (
+                  <p className="text-sm text-destructive">{fieldErrors.password}</p>
+                ) : null}
               </div>
 
               {mode === "signup" && (
                 <div className="grid gap-2">
                   <Label htmlFor="confirm-password">Confirm Password</Label>
-                  <Input id="confirm-password" type="password" required />
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                    required
+                  />
+                  {fieldErrors.confirmPassword ? (
+                    <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p>
+                  ) : null}
                 </div>
               )}
             </form>
           </CardContent>
 
           <CardFooter className="flex-col gap-3">
-            <Button className="w-full"><a href="/booking">{copy.submitLabel}</a></Button>
-            <Button variant="outline" className="w-full">
+            <button type="submit" form="auth-form" className={buttonVariants({ className: "w-full" })}>
+              {copy.submitLabel}
+            </button>
+            <Button variant="outline" className="w-full" type="button">
               Continue with Google
             </Button>
             <p className="text-sm text-muted-foreground">
               {copy.footer}{" "}
-              <a className="font-medium text-foreground underline-offset-4 hover:underline" href={copy.footerHref}>
+              <Link className="font-medium text-foreground underline-offset-4 hover:underline" to={copy.footerHref}>
                 {copy.footerLink}
-              </a>
+              </Link>
             </p>
           </CardFooter>
         </Card>
