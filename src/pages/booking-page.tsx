@@ -134,6 +134,22 @@ function getTodayValue() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function gymMatchesQuery(gym: Gym, query: string) {
+  const normalizedQuery = query.trim().toLowerCase()
+
+  if (!normalizedQuery) {
+    return true
+  }
+
+  return (
+    gym.name.toLowerCase().includes(normalizedQuery) ||
+    gym.address.toLowerCase().includes(normalizedQuery) ||
+    gym.courts.some((court) =>
+      court.name.toLowerCase().includes(normalizedQuery)
+    )
+  )
+}
+
 export function BookingPage() {
   const navigate = useNavigate()
   const { addBooking, isSlotBooked } = useBookings()
@@ -145,6 +161,12 @@ export function BookingPage() {
   const [selectedSlots, setSelectedSlots] = useState([
     gyms[0].courts[0].availableSlots[0],
   ])
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const filteredGyms = useMemo(
+    () => gyms.filter((gym) => gymMatchesQuery(gym, searchQuery)),
+    [searchQuery]
+  )
 
   const selectedGym = useMemo(
     () => gyms.find((gym) => gym.id === selectedGymId) ?? gyms[0],
@@ -169,7 +191,9 @@ export function BookingPage() {
   )
 
   function pickFirstAvailableSlot(gym: Gym, court: Court, date: string) {
-    return court.availableSlots.find((slot) => !isSlotBooked(gym.id, court.id, date, slot))
+    return court.availableSlots.find(
+      (slot) => !isSlotBooked(gym.id, court.id, date, slot)
+    )
   }
 
   function handleGymChange(gym: Gym) {
@@ -182,7 +206,11 @@ export function BookingPage() {
 
   function handleCourtChange(court: Court) {
     setSelectedCourtId(court.id)
-    const firstAvailable = pickFirstAvailableSlot(selectedGym, court, selectedDate)
+    const firstAvailable = pickFirstAvailableSlot(
+      selectedGym,
+      court,
+      selectedDate
+    )
     setSelectedSlots(firstAvailable ? [firstAvailable] : [])
   }
 
@@ -190,7 +218,8 @@ export function BookingPage() {
     setSelectedDate(nextDate)
     setSelectedSlots((currentSlots) =>
       currentSlots.filter(
-        (slot) => !isSlotBooked(selectedGym.id, selectedCourt.id, nextDate, slot)
+        (slot) =>
+          !isSlotBooked(selectedGym.id, selectedCourt.id, nextDate, slot)
       )
     )
   }
@@ -240,8 +269,12 @@ export function BookingPage() {
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
             <span>
-              <span className="block text-base font-bold leading-tight">PickleBuddy</span>
-              <span className="block text-xs text-muted-foreground">Client booking</span>
+              <span className="block text-base leading-tight font-bold">
+                PickleBuddy
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Client booking
+              </span>
             </span>
           </Link>
           <div className="flex items-center gap-2">
@@ -279,96 +312,121 @@ export function BookingPage() {
                   Book a pickleball court
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Choose a gym, pick one of its courts, then reserve an available time slot.
+                  Choose a gym, pick one of its courts, then reserve an
+                  available time slot.
                 </p>
               </div>
               <div className="relative w-full lg:max-w-xs">
                 <Search
-                  className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                   aria-hidden="true"
                 />
-                <Input className="pl-8" placeholder="Search gyms or courts" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search gyms or courts"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
               </div>
             </div>
           </div>
 
           <section className="grid gap-3">
             <Label>Gyms</Label>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {gyms.map((gym) => {
-                const isSelected = gym.id === selectedGym.id
+            {filteredGyms.length === 0 ? (
+              <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+                No gyms or courts match "{searchQuery}".
+              </p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {filteredGyms.map((gym) => {
+                  const isSelected = gym.id === selectedGym.id
 
-                return (
-                  <button
-                    key={gym.id}
-                    type="button"
-                    onClick={() => handleGymChange(gym)}
-                    className={cn(
-                      "rounded-lg border bg-card p-4 text-left shadow-xs transition hover:border-primary/60 hover:shadow-md",
-                      isSelected && "border-primary ring-3 ring-primary/20"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="font-semibold leading-tight">{gym.name}</h2>
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <MapPin className="size-3.5" aria-hidden="true" />
-                          {gym.address}
-                        </p>
+                  return (
+                    <button
+                      key={gym.id}
+                      type="button"
+                      onClick={() => handleGymChange(gym)}
+                      className={cn(
+                        "rounded-lg border bg-card p-4 text-left shadow-xs transition hover:border-primary/60 hover:shadow-md",
+                        isSelected && "border-primary ring-3 ring-primary/20"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="leading-tight font-semibold">
+                            {gym.name}
+                          </h2>
+                          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MapPin className="size-3.5" aria-hidden="true" />
+                            {gym.address}
+                          </p>
+                        </div>
+                        <span className="rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary">
+                          {gym.rating}
+                        </span>
                       </div>
-                      <span className="rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary">
-                        {gym.rating}
-                      </span>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{gym.distance}</span>
-                      <span>{gym.courts.length} court{gym.courts.length > 1 ? "s" : ""}</span>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{gym.distance}</span>
+                        <span>
+                          {gym.courts.length} court
+                          {gym.courts.length > 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </section>
 
           <section className="grid gap-3">
             <Label>{selectedGym.name} courts</Label>
             <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
               <div className="flex min-w-max snap-x gap-3">
-              {selectedGym.courts.map((court) => {
-                const isSelected = court.id === selectedCourt.id
+                {selectedGym.courts.map((court) => {
+                  const isSelected = court.id === selectedCourt.id
 
-                return (
-                  <button
-                    key={court.id}
-                    type="button"
-                    onClick={() => handleCourtChange(court)}
-                    className={cn(
-                      "w-64 snap-start rounded-lg border bg-background p-3 text-left shadow-xs transition hover:border-primary/60",
-                      isSelected && "border-primary bg-primary/5 ring-3 ring-primary/20"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-semibold leading-tight">{court.name}</h3>
-                        <p className="mt-1 text-xs text-muted-foreground">{court.surface}</p>
+                  return (
+                    <button
+                      key={court.id}
+                      type="button"
+                      onClick={() => handleCourtChange(court)}
+                      className={cn(
+                        "w-64 snap-start rounded-lg border bg-background p-3 text-left shadow-xs transition hover:border-primary/60",
+                        isSelected &&
+                          "border-primary bg-primary/5 ring-3 ring-primary/20"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="leading-tight font-semibold">
+                            {court.name}
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {court.surface}
+                          </p>
+                        </div>
+                        {isSelected ? (
+                          <CheckCircle2
+                            className="size-5 shrink-0 text-primary"
+                            aria-hidden="true"
+                          />
+                        ) : null}
                       </div>
-                      {isSelected ? (
-                        <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" />
-                      ) : null}
-                    </div>
-                    <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <UsersRound className="size-3.5" aria-hidden="true" />
-                        {court.capacity}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock3 className="size-3.5" aria-hidden="true" />
-                        {court.availableSlots.length} slots open
-                      </span>
-                    </div>
-                  </button>
-                )
-              })}
+                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <UsersRound className="size-3.5" aria-hidden="true" />
+                          {court.capacity}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock3 className="size-3.5" aria-hidden="true" />
+                          {court.availableSlots.length} slots open
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </section>
@@ -393,7 +451,9 @@ export function BookingPage() {
                     <Button
                       key={slot}
                       type="button"
-                      variant={selectedSlots.includes(slot) ? "default" : "outline"}
+                      variant={
+                        selectedSlots.includes(slot) ? "default" : "outline"
+                      }
                       onClick={() => toggleSlot(slot)}
                       disabled={isBooked}
                       title={isBooked ? "Already booked" : undefined}
@@ -412,27 +472,43 @@ export function BookingPage() {
           <Card className="rounded-lg">
             <CardHeader>
               <CardTitle>Booking summary</CardTitle>
-              <CardDescription>Review your selected schedule before confirming.</CardDescription>
+              <CardDescription>
+                Review your selected schedule before confirming.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="grid gap-1">
-                <span className="text-xs font-medium text-muted-foreground">Gym</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Gym
+                </span>
                 <span className="font-medium">{selectedGym.name}</span>
-                <span className="text-sm text-muted-foreground">{selectedGym.address}</span>
+                <span className="text-sm text-muted-foreground">
+                  {selectedGym.address}
+                </span>
               </div>
               <div className="grid gap-1">
-                <span className="text-xs font-medium text-muted-foreground">Court</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Court
+                </span>
                 <span className="font-medium">{selectedCourt.name}</span>
-                <span className="text-sm text-muted-foreground">{selectedCourt.surface}</span>
+                <span className="text-sm text-muted-foreground">
+                  {selectedCourt.surface}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-muted p-3">
-                  <span className="block text-xs text-muted-foreground">Date</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Date
+                  </span>
                   <span className="mt-1 block font-medium">{selectedDate}</span>
                 </div>
                 <div className="rounded-lg bg-muted p-3">
-                  <span className="block text-xs text-muted-foreground">Slots</span>
-                  <span className="mt-1 block font-medium">{selectedSlots.length}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Slots
+                  </span>
+                  <span className="mt-1 block font-medium">
+                    {selectedSlots.length}
+                  </span>
                 </div>
               </div>
               <div className="rounded-lg bg-muted p-3">
@@ -440,7 +516,9 @@ export function BookingPage() {
                   Selected time slots
                 </span>
                 <span className="mt-1 block font-medium">
-                  {selectedSlots.length > 0 ? selectedSlots.join(", ") : "No slots selected"}
+                  {selectedSlots.length > 0
+                    ? selectedSlots.join(", ")
+                    : "No slots selected"}
                 </span>
               </div>
               <Button

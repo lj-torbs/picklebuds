@@ -1,24 +1,19 @@
-import {
-  LogIn,
-  Menu,
-  UserPlus,
-} from "lucide-react";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { LogIn, Menu, UserPlus } from "lucide-react"
+import { Link } from "react-router-dom"
+import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@/components/ui/sheet"
 
 const navLinks = [
   { label: "Home", href: "#" },
   { label: "Features", href: "#features" },
-  { label: "Contact", href: "#contact" },
-  { label: "Pricing", href: "#pricing"},
-  { label: "About Us", href: "#about"}
-];
+  { label: "How it works", href: "#workflow" },
+]
 
 export function LandingNav() {
   return (
@@ -34,9 +29,7 @@ export function LandingNav() {
             />
           </div>
           <div className="leading-tight">
-            <p className="font-bold tracking-tight text-lg">
-              PickleBuddy
-            </p>
+            <p className="text-lg font-bold tracking-tight">PickleBuddy</p>
             <p className="text-xs text-muted-foreground">
               Smart Court Reservation
             </p>
@@ -81,39 +74,48 @@ export function LandingNav() {
           {/* Mobile Menu */}
           <Sheet>
             <SheetTrigger>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden"
-              >
+              <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
             <SheetContent side="right">
               <div className="mt-8 flex flex-col gap-5">
                 {navLinks.map((item) => (
-                  <a
+                  <SheetClose
                     key={item.label}
-                    href={item.href}
-                    className="text-lg font-medium hover:text-primary"
+                    render={
+                      <a
+                        href={item.href}
+                        className="text-lg font-medium hover:text-primary"
+                      />
+                    }
                   >
                     {item.label}
-                  </a>
+                  </SheetClose>
                 ))}
                 <hr className="my-2" />
-                <Link to="/booking" className={buttonVariants({ variant: "outline" })}>
+                <SheetClose
+                  render={
+                    <Link
+                      to="/booking"
+                      className={buttonVariants({ variant: "outline" })}
+                    />
+                  }
+                >
                   <LogIn className="mr-2 h-4 w-4" />
                   Login
-                </Link>
-                <Link to="/signup" className={buttonVariants({})}>
+                </SheetClose>
+                <SheetClose
+                  render={<Link to="/signup" className={buttonVariants({})} />}
+                >
                   <UserPlus className="mr-2 h-4 w-4" />
                   Register
-                </Link>
+                </SheetClose>
               </div>
             </SheetContent>
           </Sheet>
         </div>
       </div>
     </header>
-  );
+  )
 }

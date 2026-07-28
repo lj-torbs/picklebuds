@@ -17,12 +17,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
 import { useAuth } from "@/lib/auth-context"
-import { loginSchema, sanitizeEmail, sanitizeText, signupSchema } from "@/lib/validation"
+import {
+  loginSchema,
+  sanitizeEmail,
+  sanitizeText,
+  signupSchema,
+} from "@/lib/validation"
 
 type AuthMode = "login" | "signup"
 
 function firstFieldErrors(error: z.ZodError): Record<string, string> {
-  const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>
+  const fieldErrors = error.flatten().fieldErrors as Record<
+    string,
+    string[] | undefined
+  >
   const result: Record<string, string> = {}
 
   for (const [field, messages] of Object.entries(fieldErrors)) {
@@ -97,14 +105,19 @@ export function AuthCard({ mode }: AuthCardProps) {
         setFieldErrors(errors)
         toast.add({
           title: "Check your details",
-          description: Object.values(errors)[0] ?? "Some fields need attention.",
+          description:
+            Object.values(errors)[0] ?? "Some fields need attention.",
           type: "error",
         })
         return
       }
 
       setFieldErrors({})
-      signup({ name: result.data.name, email: result.data.email, password: result.data.password })
+      signup({
+        name: result.data.name,
+        email: result.data.email,
+        password: result.data.password,
+      })
       toast.add({
         title: "Account created",
         description: `Welcome, ${result.data.name}!`,
@@ -118,7 +131,8 @@ export function AuthCard({ mode }: AuthCardProps) {
         setFieldErrors(errors)
         toast.add({
           title: "Check your details",
-          description: Object.values(errors)[0] ?? "Some fields need attention.",
+          description:
+            Object.values(errors)[0] ?? "Some fields need attention.",
           type: "error",
         })
         return
@@ -153,17 +167,13 @@ export function AuthCard({ mode }: AuthCardProps) {
         <div className="absolute inset-0 bg-linear-to-br from-black/70 via-black/30 to-primary/30" />
 
         {/* Glow */}
-        <div className="absolute -left-32 top-24 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
-        <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute top-24 -left-32 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute right-10 bottom-10 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
 
         {/* Content */}
         <div className="relative z-10 flex w-full flex-col justify-between p-10">
-
           {/* Logo */}
-          <Link
-            to="/"
-            className="flex w-fit items-center gap-3"
-          >
+          <Link to="/" className="flex w-fit items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-lg">
               <CalendarCheck className="h-5 w-5 text-white" />
             </div>
@@ -172,15 +182,13 @@ export function AuthCard({ mode }: AuthCardProps) {
               <h2 className="text-lg font-bold tracking-wide text-white">
                 PickleBuddy
               </h2>
-              <p className="text-xs text-white/70">
-                Court Booking Platform
-              </p>
+              <p className="text-xs text-white/70">Court Booking Platform</p>
             </div>
           </Link>
 
           {/* Center Text */}
           <div className="max-w-xl">
-            <h1 className="mt-6 text-5xl font-extrabold leading-tight text-white">
+            <h1 className="mt-6 text-5xl leading-tight font-extrabold text-white">
               Book courts.
               <br />
               Play more.
@@ -189,37 +197,29 @@ export function AuthCard({ mode }: AuthCardProps) {
             </h1>
 
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/75">
-              Manage reservations, organize matches, and connect with players—all
-              from one modern platform built for pickleball communities.
+              Manage reservations, organize matches, and connect with
+              players—all from one modern platform built for pickleball
+              communities.
             </p>
           </div>
 
           {/* Bottom Cards */}
           <div className="flex gap-4 text-white">
-
             <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
               <p className="text-3xl font-bold">500+</p>
-              <p className="text-sm text-white/70">
-                Players Registered
-              </p>
+              <p className="text-sm text-white/70">Players Registered</p>
             </div>
 
             <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
               <p className="text-3xl font-bold">24/7</p>
-              <p className="text-sm text-white/70">
-                Court Booking
-              </p>
+              <p className="text-sm text-white/70">Court Booking</p>
             </div>
 
             <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
               <p className="text-3xl font-bold">100%</p>
-              <p className="text-sm text-white/70">
-                Mobile Friendly
-              </p>
+              <p className="text-sm text-white/70">Mobile Friendly</p>
             </div>
-
           </div>
-
         </div>
       </section>
 
@@ -237,7 +237,7 @@ export function AuthCard({ mode }: AuthCardProps) {
                   <Label htmlFor="name">Full name</Label>
                   <div className="relative">
                     <UserRound
-                      className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                      className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                       aria-hidden="true"
                     />
                     <Input
@@ -251,7 +251,9 @@ export function AuthCard({ mode }: AuthCardProps) {
                     />
                   </div>
                   {fieldErrors.name ? (
-                    <p className="text-sm text-destructive">{fieldErrors.name}</p>
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.name}
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -260,7 +262,7 @@ export function AuthCard({ mode }: AuthCardProps) {
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <Mail
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                   />
                   <Input
@@ -277,7 +279,9 @@ export function AuthCard({ mode }: AuthCardProps) {
                   />
                 </div>
                 {fieldErrors.email ? (
-                  <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.email}
+                  </p>
                 ) : null}
               </div>
 
@@ -307,7 +311,9 @@ export function AuthCard({ mode }: AuthCardProps) {
                   </p>
                 ) : null}
                 {fieldErrors.password ? (
-                  <p className="text-sm text-destructive">{fieldErrors.password}</p>
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.password}
+                  </p>
                 ) : null}
               </div>
 
@@ -323,7 +329,9 @@ export function AuthCard({ mode }: AuthCardProps) {
                     required
                   />
                   {fieldErrors.confirmPassword ? (
-                    <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p>
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.confirmPassword}
+                    </p>
                   ) : null}
                 </div>
               )}
@@ -331,15 +339,28 @@ export function AuthCard({ mode }: AuthCardProps) {
           </CardContent>
 
           <CardFooter className="flex-col gap-3">
-            <button type="submit" form="auth-form" className={buttonVariants({ className: "w-full" })}>
+            <button
+              type="submit"
+              form="auth-form"
+              className={buttonVariants({ className: "w-full" })}
+            >
               {copy.submitLabel}
             </button>
-            <Button variant="outline" className="w-full" type="button">
+            <Button
+              variant="outline"
+              className="w-full"
+              type="button"
+              disabled
+              title="Google sign-in isn't available in this preview build yet"
+            >
               Continue with Google
             </Button>
             <p className="text-sm text-muted-foreground">
               {copy.footer}{" "}
-              <Link className="font-medium text-foreground underline-offset-4 hover:underline" to={copy.footerHref}>
+              <Link
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+                to={copy.footerHref}
+              >
                 {copy.footerLink}
               </Link>
             </p>

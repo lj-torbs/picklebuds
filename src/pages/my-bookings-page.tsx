@@ -28,7 +28,14 @@ import type { Booking, BookingStatus } from "@/lib/bookings-context"
 import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
 
-const rescheduleSlots = ["7:30 AM", "9:00 AM", "10:30 AM", "1:00 PM", "3:30 PM", "6:00 PM"]
+const rescheduleSlots = [
+  "7:30 AM",
+  "9:00 AM",
+  "10:30 AM",
+  "1:00 PM",
+  "3:30 PM",
+  "6:00 PM",
+]
 
 const statusStyles: Record<BookingStatus, string> = {
   confirmed: "bg-primary/15 text-primary",
@@ -47,12 +54,20 @@ export function MyBookingsPage() {
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null)
   const [draftDate, setDraftDate] = useState("")
   const [draftSlots, setDraftSlots] = useState<string[]>([])
+  const [cancelCandidateId, setCancelCandidateId] = useState<string | null>(
+    null
+  )
 
   const upcomingBookings = bookings.filter(
-    (booking) => booking.status !== "completed" && booking.status !== "cancelled"
+    (booking) =>
+      booking.status !== "completed" && booking.status !== "cancelled"
   )
-  const completedBookings = bookings.filter((booking) => booking.status === "completed")
-  const cancelledBookings = bookings.filter((booking) => booking.status === "cancelled")
+  const completedBookings = bookings.filter(
+    (booking) => booking.status === "completed"
+  )
+  const cancelledBookings = bookings.filter(
+    (booking) => booking.status === "cancelled"
+  )
 
   function startReschedule(booking: Booking) {
     setEditingBookingId(booking.id)
@@ -84,8 +99,17 @@ export function MyBookingsPage() {
     })
   }
 
-  function cancelBooking(bookingId: string) {
+  function requestCancel(bookingId: string) {
+    setCancelCandidateId(bookingId)
+  }
+
+  function dismissCancel() {
+    setCancelCandidateId(null)
+  }
+
+  function confirmCancel(bookingId: string) {
     cancelBookingInStore(bookingId)
+    setCancelCandidateId(null)
     if (editingBookingId === bookingId) {
       setEditingBookingId(null)
     }
@@ -105,8 +129,12 @@ export function MyBookingsPage() {
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
             <span>
-              <span className="block text-base font-bold leading-tight">PickleBuddy</span>
-              <span className="block text-xs text-muted-foreground">My bookings</span>
+              <span className="block text-base leading-tight font-bold">
+                PickleBuddy
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                My bookings
+              </span>
             </span>
           </Link>
           <div className="flex items-center gap-2">
@@ -135,12 +163,15 @@ export function MyBookingsPage() {
       <section className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_320px]">
         <div className="grid gap-6">
           <div>
-            <p className="text-sm font-medium text-primary">Reservation history</p>
+            <p className="text-sm font-medium text-primary">
+              Reservation history
+            </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
               My bookings
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Review upcoming court reservations, check selected time slots, or create a new booking.
+              Review upcoming court reservations, check selected time slots, or
+              create a new booking.
             </p>
           </div>
 
@@ -154,7 +185,10 @@ export function MyBookingsPage() {
                   isEditing={editingBookingId === booking.id}
                   draftDate={draftDate}
                   draftSlots={draftSlots}
-                  onCancel={() => cancelBooking(booking.id)}
+                  isConfirmingCancel={cancelCandidateId === booking.id}
+                  onRequestCancel={() => requestCancel(booking.id)}
+                  onConfirmCancel={() => confirmCancel(booking.id)}
+                  onDismissCancel={dismissCancel}
                   onEdit={() => startReschedule(booking)}
                   onDraftDateChange={setDraftDate}
                   onDraftSlotToggle={toggleDraftSlot}
@@ -190,30 +224,41 @@ export function MyBookingsPage() {
           <Card className="rounded-lg">
             <CardHeader>
               <CardTitle>Booking overview</CardTitle>
-              <CardDescription>Your current frontend sample reservations.</CardDescription>
+              <CardDescription>
+                Your current frontend sample reservations.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-muted p-3">
-                  <span className="block text-xs text-muted-foreground">Upcoming</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Upcoming
+                  </span>
                   <span className="mt-1 block text-2xl font-semibold">
                     {upcomingBookings.length}
                   </span>
                 </div>
                 <div className="rounded-lg bg-muted p-3">
-                  <span className="block text-xs text-muted-foreground">Completed</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Completed
+                  </span>
                   <span className="mt-1 block text-2xl font-semibold">
                     {completedBookings.length}
                   </span>
                 </div>
               </div>
               <div className="rounded-lg bg-muted p-3">
-                <span className="block text-xs text-muted-foreground">Cancelled</span>
+                <span className="block text-xs text-muted-foreground">
+                  Cancelled
+                </span>
                 <span className="mt-1 block text-2xl font-semibold">
                   {cancelledBookings.length}
                 </span>
               </div>
-              <Link to="/booking" className={buttonVariants({ className: "w-full" })}>
+              <Link
+                to="/booking"
+                className={buttonVariants({ className: "w-full" })}
+              >
                 <CalendarDays className="size-4" aria-hidden="true" />
                 Book another court
               </Link>
@@ -231,7 +276,10 @@ function BookingRow({
   isEditing = false,
   draftDate = "",
   draftSlots = [],
-  onCancel,
+  isConfirmingCancel = false,
+  onRequestCancel,
+  onConfirmCancel,
+  onDismissCancel,
   onEdit,
   onDraftDateChange,
   onDraftSlotToggle,
@@ -243,7 +291,10 @@ function BookingRow({
   isEditing?: boolean
   draftDate?: string
   draftSlots?: string[]
-  onCancel?: () => void
+  isConfirmingCancel?: boolean
+  onRequestCancel?: () => void
+  onConfirmCancel?: () => void
+  onDismissCancel?: () => void
   onEdit?: () => void
   onDraftDateChange?: (date: string) => void
   onDraftSlotToggle?: (slot: string) => void
@@ -286,16 +337,50 @@ function BookingRow({
         </div>
 
         {!compact ? (
-          <div className="flex shrink-0 gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onEdit}>
-              <RotateCcw className="size-4" aria-hidden="true" />
-              Reschedule
-            </Button>
-            <Button type="button" variant="destructive" size="sm" onClick={onCancel}>
-              <XCircle className="size-4" aria-hidden="true" />
-              Cancel
-            </Button>
-          </div>
+          isConfirmingCancel ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Cancel this booking?
+              </span>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={onConfirmCancel}
+              >
+                Yes, cancel
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onDismissCancel}
+              >
+                No, keep it
+              </Button>
+            </div>
+          ) : (
+            <div className="flex shrink-0 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onEdit}
+              >
+                <RotateCcw className="size-4" aria-hidden="true" />
+                Reschedule
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={onRequestCancel}
+              >
+                <XCircle className="size-4" aria-hidden="true" />
+                Cancel
+              </Button>
+            </div>
+          )
         ) : null}
       </div>
 
@@ -303,7 +388,10 @@ function BookingRow({
         <div className="mt-4 grid gap-4 rounded-lg bg-muted p-4">
           <div className="grid gap-2 sm:max-w-xs">
             <span className="text-sm font-medium">New date</span>
-            <DatePicker value={draftDate} onChange={(date) => onDraftDateChange?.(date)} />
+            <DatePicker
+              value={draftDate}
+              onChange={(date) => onDraftDateChange?.(date)}
+            />
           </div>
           <div className="grid gap-2">
             <span className="text-sm font-medium">New time slots</span>
@@ -321,11 +409,21 @@ function BookingRow({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={onSave} disabled={draftSlots.length === 0}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onSave}
+              disabled={draftSlots.length === 0}
+            >
               <CheckCircle2 className="size-4" aria-hidden="true" />
               Save changes
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onStopEditing}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onStopEditing}
+            >
               Keep current booking
             </Button>
           </div>

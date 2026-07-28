@@ -4,6 +4,9 @@ import * as React from "react"
 type AuthUser = {
   name: string
   email: string
+  phone?: string
+  location?: string
+  joinedAt: string
 }
 
 type LoginInput = {
@@ -17,11 +20,14 @@ type SignupInput = {
   password: string
 }
 
+type ProfileUpdate = Partial<Pick<AuthUser, "name" | "phone" | "location">>
+
 type AuthContextValue = {
   user: AuthUser | null
   login: (input: LoginInput) => void
   signup: (input: SignupInput) => void
   logout: () => void
+  updateProfile: (update: ProfileUpdate) => void
 }
 
 const STORAGE_KEY = "pb-auth-user"
@@ -65,6 +71,19 @@ function deriveNameFromEmail(email: string) {
     .join(" ")
 }
 
+function mergeWithExisting(next: { name?: string; email: string }): AuthUser {
+  const existing = readStoredUser()
+  const base = existing && existing.email === next.email ? existing : null
+
+  return {
+    name: next.name ?? base?.name ?? deriveNameFromEmail(next.email),
+    email: next.email,
+    phone: base?.phone,
+    location: base?.location,
+    joinedAt: base?.joinedAt ?? new Date().toISOString(),
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<AuthUser | null>(readStoredUser)
 
@@ -79,14 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = React.useCallback(
     ({ email }: LoginInput) => {
-      persistUser({ name: deriveNameFromEmail(email), email })
+      persistUser(mergeWithExisting({ email }))
     },
     [persistUser]
   )
 
   const signup = React.useCallback(
     ({ name, email }: SignupInput) => {
-      persistUser({ name, email })
+      persistUser(mergeWithExisting({ name, email }))
     },
     [persistUser]
   )
@@ -95,9 +114,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     persistUser(null)
   }, [persistUser])
 
+  const updateProfile = React.useCallback((update: ProfileUpdate) => {
+    setUser((current) => {
+      if (!current) {
+        return current
+      }
+
+      const nextUser = { ...current, ...update }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
+      return nextUser
+    })
+  }, [])
+
   const value = React.useMemo(
-    () => ({ user, login, signup, logout }),
-    [user, login, signup, logout]
+    () => ({ user, login, signup, logout, updateProfile }),
+    [user, login, signup, logout, updateProfile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
