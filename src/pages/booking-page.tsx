@@ -1,137 +1,90 @@
 import { useMemo, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 import {
+  ArrowRight,
   Bell,
   CalendarCheck,
-  CheckCircle2,
   Clock3,
   MapPin,
   Search,
+  Star,
   UserRound,
-  UsersRound,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { buttonVariants } from "@/components/ui/button-variants"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/toast"
-import { useBookings } from "@/lib/bookings-context"
-import { cn } from "@/lib/utils"
+import { GymPhoto } from "@/shared/components/gyms/gym-photo"
+import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
+import type { Court, Gym } from "@/shared/lib/gyms-context"
+import { useGyms } from "@/shared/lib/gyms-context"
 
-type Court = {
-  id: string
-  name: string
-  surface: string
-  capacity: string
-  availableSlots: string[]
+type AvailabilityFilter = "all" | "active" | "open-now"
+type PriceFilter = "all" | "budget" | "standard" | "premium"
+
+const gymMeta: Record<string, { distance: string; rating: string }> = {
+  northside: { distance: "0.8 km", rating: "4.9" },
+  riverside: { distance: "2.1 km", rating: "4.7" },
+  central: { distance: "3.4 km", rating: "4.8" },
+  "visayan-village": { distance: "4.2 km", rating: "4.6" },
+  "magugpo-east": { distance: "1.6 km", rating: "4.8" },
+  madaum: { distance: "6.9 km", rating: "4.5" },
+  canocotan: { distance: "5.3 km", rating: "4.9" },
 }
 
-type Gym = {
-  id: string
-  name: string
-  address: string
-  distance: string
-  rating: string
-  courts: Court[]
+function getGymMeta(gym: Gym) {
+  return gymMeta[gym.id] ?? { distance: "Nearby", rating: "New" }
 }
 
-const gyms: Gym[] = [
-  {
-    id: "northside",
-    name: "Northside Pickleball Gym",
-    address: "12 Greenway Avenue",
-    distance: "1.4 km away",
-    rating: "4.9",
-    courts: [
-      {
-        id: "northside-a",
-        name: "Court A",
-        surface: "Indoor cushioned",
-        capacity: "Singles or doubles",
-        availableSlots: ["8:00 AM", "9:30 AM", "1:00 PM", "5:30 PM"],
-      },
-      {
-        id: "northside-b",
-        name: "Court B",
-        surface: "Indoor cushioned",
-        capacity: "Doubles preferred",
-        availableSlots: ["10:00 AM", "2:30 PM", "4:00 PM", "7:00 PM"],
-      },
-      {
-        id: "northside-c",
-        name: "Court C",
-        surface: "Indoor premium",
-        capacity: "Training court",
-        availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
-      },
-      {
-        id: "northside-d",
-        name: "Court D",
-        surface: "Indoor premium",
-        capacity: "Training court",
-        availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
-      },
-      {
-        id: "northside-e",
-        name: "Court E",
-        surface: "Indoor premium",
-        capacity: "Training court",
-        availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
-      },
-    ],
-  },
-  {
-    id: "riverside",
-    name: "Riverside Sports Center",
-    address: "88 Rally Road",
-    distance: "3.2 km away",
-    rating: "4.7",
-    courts: [
-      {
-        id: "riverside-main",
-        name: "Main Court",
-        surface: "Outdoor acrylic",
-        capacity: "Singles or doubles",
-        availableSlots: ["7:30 AM", "12:00 PM", "3:30 PM", "6:00 PM"],
-      },
-    ],
-  },
-  {
-    id: "central",
-    name: "Central Court Club",
-    address: "204 Matchpoint Street",
-    distance: "4.8 km away",
-    rating: "4.8",
-    courts: [
-      {
-        id: "central-1",
-        name: "Court 1",
-        surface: "Indoor hard court",
-        capacity: "Doubles preferred",
-        availableSlots: ["8:30 AM", "11:00 AM", "2:00 PM"],
-      },
-      {
-        id: "central-2",
-        name: "Court 2",
-        surface: "Indoor hard court",
-        capacity: "Singles or doubles",
-        availableSlots: ["9:00 AM", "1:30 PM", "5:00 PM", "8:00 PM"],
-      },
-    ],
-  },
-]
+function getGymLocation(gym: Gym) {
+  const parts = gym.address.split(",").map((part) => part.trim())
 
-function getTodayValue() {
-  return new Date().toISOString().slice(0, 10)
+  return parts.length >= 2 ? parts[parts.length - 2] : gym.address
+}
+
+function getOpenCourts(gym: Gym) {
+  return gym.courts.filter((court) => court.status === "available")
+}
+
+function getOpenSlotCount(gym: Gym) {
+  return getOpenCourts(gym).reduce(
+    (total, court) => total + court.availableSlots.length,
+    0
+  )
+}
+
+function getNextSlot(gym: Gym) {
+  return (
+    getOpenCourts(gym).find((court) => court.availableSlots.length > 0)
+      ?.availableSlots[0] ?? "No openings"
+  )
+}
+
+function getPriceRange(courts: Court[]) {
+  if (courts.length === 0) {
+    return "No courts"
+  }
+
+  const prices = courts.map((court) => court.pricePerHour)
+  const min = Math.min(...prices)
+  const max = Math.max(...prices)
+
+  return min === max ? `$${min}/hr` : `$${min}-${max}/hr`
+}
+
+function courtMatchesPrice(court: Court, filter: PriceFilter) {
+  if (filter === "budget") {
+    return court.pricePerHour <= 12
+  }
+
+  if (filter === "standard") {
+    return court.pricePerHour > 12 && court.pricePerHour <= 15
+  }
+
+  if (filter === "premium") {
+    return court.pricePerHour > 15
+  }
+
+  return true
 }
 
 function gymMatchesQuery(gym: Gym, query: string) {
@@ -144,128 +97,71 @@ function gymMatchesQuery(gym: Gym, query: string) {
   return (
     gym.name.toLowerCase().includes(normalizedQuery) ||
     gym.address.toLowerCase().includes(normalizedQuery) ||
-    gym.courts.some((court) =>
-      court.name.toLowerCase().includes(normalizedQuery)
+    gym.courts.some(
+      (court) =>
+        court.name.toLowerCase().includes(normalizedQuery) ||
+        court.surface.toLowerCase().includes(normalizedQuery) ||
+        court.capacity.toLowerCase().includes(normalizedQuery)
     )
   )
 }
 
-export function BookingPage() {
-  const navigate = useNavigate()
-  const { addBooking, isSlotBooked } = useBookings()
-  const toast = useToast()
+function gymMatchesAvailability(gym: Gym, filter: AvailabilityFilter) {
+  if (filter === "active") {
+    return gym.status === "active"
+  }
 
-  const [selectedGymId, setSelectedGymId] = useState(gyms[0].id)
-  const [selectedCourtId, setSelectedCourtId] = useState(gyms[0].courts[0].id)
-  const [selectedDate, setSelectedDate] = useState(getTodayValue)
-  const [selectedSlots, setSelectedSlots] = useState([
-    gyms[0].courts[0].availableSlots[0],
-  ])
+  if (filter === "open-now") {
+    return gym.status === "active" && getOpenSlotCount(gym) > 0
+  }
+
+  return true
+}
+
+function gymMatchesPrice(gym: Gym, filter: PriceFilter) {
+  return (
+    filter === "all" ||
+    gym.courts.some((court) => courtMatchesPrice(court, filter))
+  )
+}
+
+export function BookingPage() {
+  const { gyms } = useGyms()
   const [searchQuery, setSearchQuery] = useState("")
+  const [locationFilter, setLocationFilter] = useState("all")
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>("all")
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState<AvailabilityFilter>("all")
+
+  const locations = useMemo(
+    () => Array.from(new Set(gyms.map((gym) => getGymLocation(gym)))).sort(),
+    [gyms]
+  )
 
   const filteredGyms = useMemo(
-    () => gyms.filter((gym) => gymMatchesQuery(gym, searchQuery)),
-    [searchQuery]
-  )
-
-  const selectedGym = useMemo(
-    () => gyms.find((gym) => gym.id === selectedGymId) ?? gyms[0],
-    [selectedGymId]
-  )
-
-  const selectedCourt = useMemo(
     () =>
-      selectedGym.courts.find((court) => court.id === selectedCourtId) ??
-      selectedGym.courts[0],
-    [selectedCourtId, selectedGym]
-  )
-
-  const bookedSlots = useMemo(
-    () =>
-      new Set(
-        selectedCourt.availableSlots.filter((slot) =>
-          isSlotBooked(selectedGym.id, selectedCourt.id, selectedDate, slot)
-        )
+      gyms.filter(
+        (gym) =>
+          gymMatchesQuery(gym, searchQuery) &&
+          (locationFilter === "all" || getGymLocation(gym) === locationFilter) &&
+          gymMatchesPrice(gym, priceFilter) &&
+          gymMatchesAvailability(gym, availabilityFilter)
       ),
-    [selectedGym.id, selectedCourt, selectedDate, isSlotBooked]
+    [availabilityFilter, gyms, locationFilter, priceFilter, searchQuery]
   )
 
-  function pickFirstAvailableSlot(gym: Gym, court: Court, date: string) {
-    return court.availableSlots.find(
-      (slot) => !isSlotBooked(gym.id, court.id, date, slot)
-    )
-  }
-
-  function handleGymChange(gym: Gym) {
-    const court = gym.courts[0]
-    setSelectedGymId(gym.id)
-    setSelectedCourtId(court.id)
-    const firstAvailable = pickFirstAvailableSlot(gym, court, selectedDate)
-    setSelectedSlots(firstAvailable ? [firstAvailable] : [])
-  }
-
-  function handleCourtChange(court: Court) {
-    setSelectedCourtId(court.id)
-    const firstAvailable = pickFirstAvailableSlot(
-      selectedGym,
-      court,
-      selectedDate
-    )
-    setSelectedSlots(firstAvailable ? [firstAvailable] : [])
-  }
-
-  function handleDateChange(nextDate: string) {
-    setSelectedDate(nextDate)
-    setSelectedSlots((currentSlots) =>
-      currentSlots.filter(
-        (slot) =>
-          !isSlotBooked(selectedGym.id, selectedCourt.id, nextDate, slot)
-      )
-    )
-  }
-
-  function toggleSlot(slot: string) {
-    if (bookedSlots.has(slot)) {
-      return
-    }
-
-    setSelectedSlots((currentSlots) => {
-      if (currentSlots.includes(slot)) {
-        return currentSlots.filter((currentSlot) => currentSlot !== slot)
-      }
-
-      return [...currentSlots, slot]
-    })
-  }
-
-  function handleConfirmBooking() {
-    if (selectedSlots.length === 0) {
-      return
-    }
-
-    addBooking({
-      gymId: selectedGym.id,
-      gym: selectedGym.name,
-      address: selectedGym.address,
-      courtId: selectedCourt.id,
-      court: selectedCourt.name,
-      date: selectedDate,
-      slots: selectedSlots,
-    })
-    toast.add({
-      title: "Booking confirmed",
-      description: `${selectedCourt.name} at ${selectedGym.name} on ${selectedDate}`,
-      type: "success",
-    })
-    navigate("/my-bookings")
-  }
+  const activeVenueCount = gyms.filter((gym) => gym.status === "active").length
+  const totalOpenSlots = gyms.reduce(
+    (total, gym) => total + getOpenSlotCount(gym),
+    0
+  )
 
   return (
     <main className="min-h-svh bg-muted/30">
-      <header className="border-b bg-background">
+      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
             <span>
@@ -302,236 +198,163 @@ export function BookingPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_360px]">
-        <div className="grid gap-6">
-          <div className="grid gap-3">
-            <p className="text-sm font-medium text-primary">Available courts</p>
-            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-              <div>
-                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Book a pickleball court
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Choose a gym, pick one of its courts, then reserve an
-                  available time slot.
-                </p>
-              </div>
-              <div className="relative w-full lg:max-w-xs">
-                <Search
-                  className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  className="pl-8"
-                  placeholder="Search gyms or courts"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <section className="grid gap-3">
-            <Label>Gyms</Label>
-            {filteredGyms.length === 0 ? (
-              <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-                No gyms or courts match "{searchQuery}".
-              </p>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {filteredGyms.map((gym) => {
-                  const isSelected = gym.id === selectedGym.id
-
-                  return (
-                    <button
-                      key={gym.id}
-                      type="button"
-                      onClick={() => handleGymChange(gym)}
-                      className={cn(
-                        "rounded-lg border bg-card p-4 text-left shadow-xs transition hover:border-primary/60 hover:shadow-md",
-                        isSelected && "border-primary ring-3 ring-primary/20"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h2 className="leading-tight font-semibold">
-                            {gym.name}
-                          </h2>
-                          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <MapPin className="size-3.5" aria-hidden="true" />
-                            {gym.address}
-                          </p>
-                        </div>
-                        <span className="rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary">
-                          {gym.rating}
-                        </span>
-                      </div>
-                      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{gym.distance}</span>
-                        <span>
-                          {gym.courts.length} court
-                          {gym.courts.length > 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="grid gap-3">
-            <Label>{selectedGym.name} courts</Label>
-            <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
-              <div className="flex min-w-max snap-x gap-3">
-                {selectedGym.courts.map((court) => {
-                  const isSelected = court.id === selectedCourt.id
-
-                  return (
-                    <button
-                      key={court.id}
-                      type="button"
-                      onClick={() => handleCourtChange(court)}
-                      className={cn(
-                        "w-64 snap-start rounded-lg border bg-background p-3 text-left shadow-xs transition hover:border-primary/60",
-                        isSelected &&
-                          "border-primary bg-primary/5 ring-3 ring-primary/20"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="leading-tight font-semibold">
-                            {court.name}
-                          </h3>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {court.surface}
-                          </p>
-                        </div>
-                        {isSelected ? (
-                          <CheckCircle2
-                            className="size-5 shrink-0 text-primary"
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <UsersRound className="size-3.5" aria-hidden="true" />
-                          {court.capacity}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock3 className="size-3.5" aria-hidden="true" />
-                          {court.availableSlots.length} slots open
-                        </span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-3">
-            <div className="grid gap-2 sm:max-w-xs">
-              <Label htmlFor="booking-date">Booking date</Label>
-              <DatePicker
-                id="booking-date"
-                value={selectedDate}
-                onChange={handleDateChange}
-              />
-            </div>
-
-            <div className="grid gap-3">
-              <Label>Available time slots</Label>
-              <div className="flex flex-wrap gap-2">
-                {selectedCourt.availableSlots.map((slot) => {
-                  const isBooked = bookedSlots.has(slot)
-
-                  return (
-                    <Button
-                      key={slot}
-                      type="button"
-                      variant={
-                        selectedSlots.includes(slot) ? "default" : "outline"
-                      }
-                      onClick={() => toggleSlot(slot)}
-                      disabled={isBooked}
-                      title={isBooked ? "Already booked" : undefined}
-                    >
-                      {slot}
-                      {isBooked ? " (booked)" : ""}
-                    </Button>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Find a court
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {gyms.length} venues in Tagum City · {activeVenueCount} accepting
+            bookings · {totalOpenSlots} open slots today
+          </p>
         </div>
 
-        <aside className="lg:sticky lg:top-6 lg:self-start">
-          <Card className="rounded-lg">
-            <CardHeader>
-              <CardTitle>Booking summary</CardTitle>
-              <CardDescription>
-                Review your selected schedule before confirming.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="grid gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Gym
-                </span>
-                <span className="font-medium">{selectedGym.name}</span>
-                <span className="text-sm text-muted-foreground">
-                  {selectedGym.address}
-                </span>
-              </div>
-              <div className="grid gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Court
-                </span>
-                <span className="font-medium">{selectedCourt.name}</span>
-                <span className="text-sm text-muted-foreground">
-                  {selectedCourt.surface}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-muted p-3">
-                  <span className="block text-xs text-muted-foreground">
-                    Date
-                  </span>
-                  <span className="mt-1 block font-medium">{selectedDate}</span>
-                </div>
-                <div className="rounded-lg bg-muted p-3">
-                  <span className="block text-xs text-muted-foreground">
-                    Slots
-                  </span>
-                  <span className="mt-1 block font-medium">
-                    {selectedSlots.length}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-lg bg-muted p-3">
-                <span className="block text-xs text-muted-foreground">
-                  Selected time slots
-                </span>
-                <span className="mt-1 block font-medium">
-                  {selectedSlots.length > 0
-                    ? selectedSlots.join(", ")
-                    : "No slots selected"}
-                </span>
-              </div>
-              <Button
-                className="w-full"
-                onClick={handleConfirmBooking}
-                disabled={selectedSlots.length === 0}
-              >
-                <CalendarCheck className="size-4" aria-hidden="true" />
-                Confirm booking
-              </Button>
-            </CardContent>
-          </Card>
-        </aside>
+        <div className="mt-4 grid gap-3 rounded-lg border bg-background p-3 shadow-xs sm:grid-cols-[minmax(220px,1.4fr)_repeat(3,minmax(140px,1fr))]">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              className="h-10 pl-10"
+              placeholder="Search gym, barangay, court"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </div>
+          <select
+            value={locationFilter}
+            onChange={(event) => setLocationFilter(event.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            aria-label="Filter by location"
+          >
+            <option value="all">All areas</option>
+            {locations.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
+          </select>
+          <select
+            value={priceFilter}
+            onChange={(event) =>
+              setPriceFilter(event.target.value as PriceFilter)
+            }
+            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            aria-label="Filter by price"
+          >
+            <option value="all">Any price</option>
+            <option value="budget">$12/hr and below</option>
+            <option value="standard">$13-$15/hr</option>
+            <option value="premium">$16/hr and up</option>
+          </select>
+          <select
+            value={availabilityFilter}
+            onChange={(event) =>
+              setAvailabilityFilter(event.target.value as AvailabilityFilter)
+            }
+            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            aria-label="Filter by availability"
+          >
+            <option value="all">Any availability</option>
+            <option value="active">Active venues</option>
+            <option value="open-now">Has open slots</option>
+          </select>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            {filteredGyms.length} matching result
+            {filteredGyms.length === 1 ? "" : "s"}
+          </p>
+          <span className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            {locationFilter === "all" ? "Tagum City" : locationFilter}
+          </span>
+        </div>
+
+        {filteredGyms.length === 0 ? (
+          <div className="mt-4 rounded-lg border bg-background p-8 text-center shadow-xs">
+            <p className="font-medium">No venues match your filters</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Change the location, price, availability, or search term.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredGyms.map((gym) => {
+              const meta = getGymMeta(gym)
+              const openCourts = getOpenCourts(gym)
+
+              return (
+                <Link
+                  key={gym.id}
+                  to={`/booking/${gym.id}`}
+                  className="group flex flex-col overflow-hidden rounded-lg border bg-background shadow-xs transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
+                >
+                  <div className="relative aspect-4/3">
+                    <GymPhoto
+                      src={gym.imageUrl}
+                      alt={gym.name}
+                      className="absolute inset-0 size-full"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
+                    <div className="absolute top-3 left-3">
+                      <GymStatusBadge status={gym.status} />
+                    </div>
+                    <div className="absolute right-3 bottom-3 left-3 flex items-center justify-between gap-2">
+                      <span className="rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground">
+                        {meta.distance}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground">
+                        <Star
+                          className="size-3 fill-primary text-primary"
+                          aria-hidden="true"
+                        />
+                        {meta.rating}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col gap-3 p-4">
+                    <div>
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{getGymLocation(gym)}</span>
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold tracking-tight">
+                        {gym.name}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {openCourts.length}/{gym.courts.length} court
+                        {gym.courts.length === 1 ? "" : "s"} open
+                      </span>
+                      <span className="font-semibold">
+                        {getPriceRange(gym.courts)}
+                      </span>
+                    </div>
+
+                    <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3 text-sm">
+                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <Clock3 className="size-3.5" aria-hidden="true" />
+                        Next: {getNextSlot(gym)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-medium text-primary">
+                        View
+                        <ArrowRight
+                          className="size-3.5 transition group-hover:translate-x-0.5"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </section>
     </main>
   )

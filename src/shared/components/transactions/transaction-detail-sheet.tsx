@@ -1,4 +1,12 @@
-import { CalendarDays, Clock3, Mail, MapPin, User } from "lucide-react"
+import {
+  CalendarDays,
+  Clock3,
+  Image,
+  Mail,
+  MapPin,
+  Receipt,
+  User,
+} from "lucide-react"
 
 import {
   PaymentStatusBadge,
@@ -52,7 +60,10 @@ export function TransactionDetailSheet({
 
               <div className="grid gap-2 rounded-lg border bg-card p-3 text-sm">
                 <span className="inline-flex items-center gap-1.5 font-medium">
-                  <User className="size-4 text-muted-foreground" aria-hidden="true" />
+                  <User
+                    className="size-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
                   {transaction.customerName}
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -63,7 +74,10 @@ export function TransactionDetailSheet({
 
               <div className="grid gap-2 rounded-lg border bg-card p-3 text-sm">
                 <span className="inline-flex items-center gap-1.5 font-medium">
-                  <MapPin className="size-4 text-muted-foreground" aria-hidden="true" />
+                  <MapPin
+                    className="size-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
                   {transaction.gym}
                 </span>
                 <span className="text-muted-foreground">
@@ -97,6 +111,48 @@ export function TransactionDetailSheet({
                   </span>
                 </div>
               </div>
+
+              {transaction.paymentReceipt ? (
+                <div className="grid gap-3 rounded-lg border bg-card p-3 text-sm">
+                  <span className="inline-flex items-center gap-1.5 font-medium">
+                    <Receipt
+                      className="size-4 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    GCash receipt
+                  </span>
+                  <div className="grid gap-1 text-muted-foreground">
+                    <span>
+                      Reference:{" "}
+                      <span className="font-medium text-foreground">
+                        {transaction.paymentReceipt.referenceNumber}
+                      </span>
+                    </span>
+                    <span>
+                      Sender:{" "}
+                      <span className="font-medium text-foreground">
+                        {transaction.paymentReceipt.accountName}
+                      </span>
+                    </span>
+                  </div>
+                  <a
+                    href={transaction.paymentReceipt.imageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="overflow-hidden rounded-lg border bg-muted"
+                  >
+                    <img
+                      src={transaction.paymentReceipt.imageUrl}
+                      alt={`GCash receipt for ${transaction.id}`}
+                      className="max-h-72 w-full object-contain"
+                    />
+                  </a>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Image className="size-3.5" aria-hidden="true" />
+                    {transaction.paymentReceipt.fileName}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             <SheetFooter className="grid grid-cols-2 gap-2">

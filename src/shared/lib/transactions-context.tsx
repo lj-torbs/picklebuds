@@ -1,7 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
-export type TransactionStatus = "confirmed" | "pending" | "completed" | "cancelled"
+import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
+
+export type TransactionStatus =
+  "confirmed" | "pending" | "completed" | "cancelled"
 export type PaymentStatus = "paid" | "unpaid" | "refunded"
 
 export type Transaction = {
@@ -19,10 +22,16 @@ export type Transaction = {
   paymentStatus: PaymentStatus
   status: TransactionStatus
   createdAt: string
+  paymentReceipt?: PaymentReceipt
+}
+
+type NewTransaction = Omit<Transaction, "createdAt"> & {
+  createdAt?: string
 }
 
 type TransactionsContextValue = {
   transactions: Transaction[]
+  addTransaction: (transaction: NewTransaction) => void
   setStatus: (id: string, status: TransactionStatus) => void
   refund: (id: string) => void
 }
@@ -33,7 +42,7 @@ const initialTransactions: Transaction[] = [
     customerName: "Jordan Alcaraz",
     customerEmail: "jordan.alcaraz@example.com",
     gymId: "northside",
-    gym: "Northside Pickleball Gym",
+    gym: "Tagum Pickleball Hub",
     courtId: "northside-b",
     court: "Court B",
     date: "2026-07-12",
@@ -49,7 +58,7 @@ const initialTransactions: Transaction[] = [
     customerName: "Mika Santos",
     customerEmail: "mika.santos@example.com",
     gymId: "central",
-    gym: "Central Court Club",
+    gym: "Mankilam Court Club",
     courtId: "central-2",
     court: "Court 2",
     date: "2026-07-15",
@@ -65,7 +74,7 @@ const initialTransactions: Transaction[] = [
     customerName: "Leo Fontanilla",
     customerEmail: "leo.fontanilla@example.com",
     gymId: "riverside",
-    gym: "Riverside Sports Center",
+    gym: "Apokon Rally Courts",
     courtId: "riverside-main",
     court: "Main Court",
     date: "2026-07-05",
@@ -81,7 +90,7 @@ const initialTransactions: Transaction[] = [
     customerName: "Ava Reyes",
     customerEmail: "ava.reyes@example.com",
     gymId: "northside",
-    gym: "Northside Pickleball Gym",
+    gym: "Tagum Pickleball Hub",
     courtId: "northside-a",
     court: "Court A",
     date: "2026-07-20",
@@ -97,7 +106,7 @@ const initialTransactions: Transaction[] = [
     customerName: "Noah Villareal",
     customerEmail: "noah.villareal@example.com",
     gymId: "central",
-    gym: "Central Court Club",
+    gym: "Mankilam Court Club",
     courtId: "central-1",
     court: "Court 1",
     date: "2026-07-09",
@@ -113,7 +122,7 @@ const initialTransactions: Transaction[] = [
     customerName: "Sofia Cruz",
     customerEmail: "sofia.cruz@example.com",
     gymId: "riverside",
-    gym: "Riverside Sports Center",
+    gym: "Apokon Rally Courts",
     courtId: "riverside-main",
     court: "Main Court",
     date: "2026-06-29",
@@ -138,6 +147,16 @@ export function TransactionsProvider({
   const [transactions, setTransactions] =
     React.useState<Transaction[]>(initialTransactions)
 
+  const addTransaction = React.useCallback((transaction: NewTransaction) => {
+    setTransactions((current) => [
+      {
+        ...transaction,
+        createdAt: transaction.createdAt ?? new Date().toISOString(),
+      },
+      ...current,
+    ])
+  }, [])
+
   const setStatus = React.useCallback(
     (id: string, status: TransactionStatus) => {
       setTransactions((current) =>
@@ -160,8 +179,8 @@ export function TransactionsProvider({
   }, [])
 
   const value = React.useMemo(
-    () => ({ transactions, setStatus, refund }),
-    [transactions, setStatus, refund]
+    () => ({ transactions, addTransaction, setStatus, refund }),
+    [transactions, addTransaction, setStatus, refund]
   )
 
   return (
@@ -175,7 +194,9 @@ export function useTransactions() {
   const context = React.useContext(TransactionsContext)
 
   if (context === undefined) {
-    throw new Error("useTransactions must be used within a TransactionsProvider")
+    throw new Error(
+      "useTransactions must be used within a TransactionsProvider"
+    )
   }
 
   return context

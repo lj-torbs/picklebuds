@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
+
 export type BookingStatus = "confirmed" | "pending" | "completed" | "cancelled"
 
 export type Booking = {
@@ -13,6 +15,7 @@ export type Booking = {
   date: string
   slots: string[]
   status: BookingStatus
+  paymentReceipt?: PaymentReceipt
 }
 
 type NewBooking = Omit<Booking, "id" | "status"> & { status?: BookingStatus }
@@ -22,15 +25,20 @@ type BookingsContextValue = {
   addBooking: (booking: NewBooking) => Booking
   cancelBooking: (id: string) => void
   rescheduleBooking: (id: string, date: string, slots: string[]) => void
-  isSlotBooked: (gymId: string, courtId: string, date: string, slot: string) => boolean
+  isSlotBooked: (
+    gymId: string,
+    courtId: string,
+    date: string,
+    slot: string
+  ) => boolean
 }
 
 const initialBookings: Booking[] = [
   {
     id: "PB-1042",
     gymId: "northside",
-    gym: "Northside Pickleball Gym",
-    address: "12 Greenway Avenue",
+    gym: "Tagum Pickleball Hub",
+    address: "Pioneer Avenue, Magugpo Poblacion, Tagum City",
     courtId: "northside-b",
     court: "Court B",
     date: "2026-07-12",
@@ -40,8 +48,8 @@ const initialBookings: Booking[] = [
   {
     id: "PB-1043",
     gymId: "central",
-    gym: "Central Court Club",
-    address: "204 Matchpoint Street",
+    gym: "Mankilam Court Club",
+    address: "Mankilam Road, Barangay Mankilam, Tagum City",
     courtId: "central-2",
     court: "Court 2",
     date: "2026-07-15",
@@ -51,8 +59,8 @@ const initialBookings: Booking[] = [
   {
     id: "PB-1019",
     gymId: "riverside",
-    gym: "Riverside Sports Center",
-    address: "88 Rally Road",
+    gym: "Apokon Rally Courts",
+    address: "Apokon Road, Barangay Apokon, Tagum City",
     courtId: "riverside-main",
     court: "Main Court",
     date: "2026-07-05",
@@ -61,7 +69,9 @@ const initialBookings: Booking[] = [
   },
 ]
 
-const BookingsContext = React.createContext<BookingsContextValue | undefined>(undefined)
+const BookingsContext = React.createContext<BookingsContextValue | undefined>(
+  undefined
+)
 
 export function BookingsProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = React.useState<Booking[]>(initialBookings)
@@ -85,13 +95,18 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
     )
   }, [])
 
-  const rescheduleBooking = React.useCallback((id: string, date: string, slots: string[]) => {
-    setBookings((current) =>
-      current.map((booking) =>
-        booking.id === id ? { ...booking, date, slots, status: "confirmed" } : booking
+  const rescheduleBooking = React.useCallback(
+    (id: string, date: string, slots: string[]) => {
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === id
+            ? { ...booking, date, slots, status: "confirmed" }
+            : booking
+        )
       )
-    )
-  }, [])
+    },
+    []
+  )
 
   const isSlotBooked = React.useCallback(
     (gymId: string, courtId: string, date: string, slot: string) =>
@@ -107,11 +122,21 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
   )
 
   const value = React.useMemo(
-    () => ({ bookings, addBooking, cancelBooking, rescheduleBooking, isSlotBooked }),
+    () => ({
+      bookings,
+      addBooking,
+      cancelBooking,
+      rescheduleBooking,
+      isSlotBooked,
+    }),
     [bookings, addBooking, cancelBooking, rescheduleBooking, isSlotBooked]
   )
 
-  return <BookingsContext.Provider value={value}>{children}</BookingsContext.Provider>
+  return (
+    <BookingsContext.Provider value={value}>
+      {children}
+    </BookingsContext.Provider>
+  )
 }
 
 export function useBookings() {

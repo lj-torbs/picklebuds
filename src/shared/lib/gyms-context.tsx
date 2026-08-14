@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import { placeholderPhoto } from "@/shared/lib/placeholder-image"
+
 export type GymStatus = "active" | "inactive"
 export type CourtStatus = "available" | "maintenance"
 
@@ -12,6 +14,7 @@ export type Court = {
   pricePerHour: number
   status: CourtStatus
   availableSlots: string[]
+  imageUrl?: string
 }
 
 export type Gym = {
@@ -21,6 +24,7 @@ export type Gym = {
   address: string
   phone: string
   status: GymStatus
+  imageUrl?: string
   courts: Court[]
 }
 
@@ -48,10 +52,11 @@ const initialGyms: Gym[] = [
   {
     id: "northside",
     ownerId: "owner-1",
-    name: "Northside Pickleball Gym",
-    address: "12 Greenway Avenue",
-    phone: "(555) 010-2231",
+    name: "Tagum Pickleball Hub",
+    address: "Pioneer Avenue, Magugpo Poblacion, Tagum City",
+    phone: "(084) 218-2231",
     status: "active",
+    imageUrl: placeholderPhoto("tagum-hub", 800, 500),
     courts: [
       {
         id: "northside-a",
@@ -61,6 +66,7 @@ const initialGyms: Gym[] = [
         pricePerHour: 12,
         status: "available",
         availableSlots: ["8:00 AM", "9:30 AM", "1:00 PM", "5:30 PM"],
+        imageUrl: placeholderPhoto("tagum-hub-a", 480, 320),
       },
       {
         id: "northside-b",
@@ -70,6 +76,7 @@ const initialGyms: Gym[] = [
         pricePerHour: 12,
         status: "available",
         availableSlots: ["10:00 AM", "2:30 PM", "4:00 PM", "7:00 PM"],
+        imageUrl: placeholderPhoto("tagum-hub-b", 480, 320),
       },
       {
         id: "northside-c",
@@ -79,16 +86,18 @@ const initialGyms: Gym[] = [
         pricePerHour: 16,
         status: "maintenance",
         availableSlots: ["11:30 AM", "3:00 PM", "6:30 PM"],
+        imageUrl: placeholderPhoto("tagum-hub-c", 480, 320),
       },
     ],
   },
   {
     id: "riverside",
     ownerId: "owner-2",
-    name: "Riverside Sports Center",
-    address: "88 Rally Road",
-    phone: "(555) 010-4471",
+    name: "Apokon Rally Courts",
+    address: "Apokon Road, Barangay Apokon, Tagum City",
+    phone: "(084) 218-4471",
     status: "active",
+    imageUrl: placeholderPhoto("apokon-rally", 800, 500),
     courts: [
       {
         id: "riverside-main",
@@ -98,16 +107,18 @@ const initialGyms: Gym[] = [
         pricePerHour: 12,
         status: "available",
         availableSlots: ["7:30 AM", "12:00 PM", "3:30 PM", "6:00 PM"],
+        imageUrl: placeholderPhoto("apokon-rally-main", 480, 320),
       },
     ],
   },
   {
     id: "central",
     ownerId: "owner-1",
-    name: "Central Court Club",
-    address: "204 Matchpoint Street",
-    phone: "(555) 010-7782",
+    name: "Mankilam Court Club",
+    address: "Mankilam Road, Barangay Mankilam, Tagum City",
+    phone: "(084) 218-7782",
     status: "inactive",
+    imageUrl: placeholderPhoto("mankilam-club", 800, 500),
     courts: [
       {
         id: "central-1",
@@ -117,6 +128,7 @@ const initialGyms: Gym[] = [
         pricePerHour: 14,
         status: "available",
         availableSlots: ["8:30 AM", "11:00 AM", "2:00 PM"],
+        imageUrl: placeholderPhoto("mankilam-club-1", 480, 320),
       },
       {
         id: "central-2",
@@ -126,6 +138,121 @@ const initialGyms: Gym[] = [
         pricePerHour: 14,
         status: "available",
         availableSlots: ["9:00 AM", "1:30 PM", "5:00 PM", "8:00 PM"],
+        imageUrl: placeholderPhoto("mankilam-club-2", 480, 320),
+      },
+    ],
+  },
+  {
+    id: "visayan-village",
+    ownerId: "owner-2",
+    name: "Visayan Village Pickleball Center",
+    address: "National Highway, Barangay Visayan Village, Tagum City",
+    phone: "(084) 218-3194",
+    status: "active",
+    imageUrl: placeholderPhoto("visayan-village-center", 800, 500),
+    courts: [
+      {
+        id: "visayan-village-1",
+        name: "Court 1",
+        surface: "Indoor cushioned",
+        capacity: "Singles or doubles",
+        pricePerHour: 13,
+        status: "available",
+        availableSlots: ["6:30 AM", "9:00 AM", "4:30 PM", "7:30 PM"],
+        imageUrl: placeholderPhoto("visayan-village-1", 480, 320),
+      },
+      {
+        id: "visayan-village-2",
+        name: "Court 2",
+        surface: "Indoor cushioned",
+        capacity: "Doubles preferred",
+        pricePerHour: 13,
+        status: "available",
+        availableSlots: ["8:00 AM", "10:30 AM", "3:00 PM", "6:00 PM"],
+        imageUrl: placeholderPhoto("visayan-village-2", 480, 320),
+      },
+    ],
+  },
+  {
+    id: "magugpo-east",
+    ownerId: "owner-1",
+    name: "Magugpo East Sports Hall",
+    address: "Rizal Street, Magugpo East, Tagum City",
+    phone: "(084) 218-6405",
+    status: "active",
+    imageUrl: placeholderPhoto("magugpo-east-hall", 800, 500),
+    courts: [
+      {
+        id: "magugpo-east-1",
+        name: "Hall Court",
+        surface: "Indoor hard court",
+        capacity: "Singles or doubles",
+        pricePerHour: 15,
+        status: "available",
+        availableSlots: ["7:00 AM", "11:00 AM", "2:30 PM", "5:00 PM"],
+        imageUrl: placeholderPhoto("magugpo-east-1", 480, 320),
+      },
+      {
+        id: "magugpo-east-2",
+        name: "Training Court",
+        surface: "Indoor hard court",
+        capacity: "Training court",
+        pricePerHour: 15,
+        status: "maintenance",
+        availableSlots: ["1:00 PM", "4:00 PM"],
+        imageUrl: placeholderPhoto("magugpo-east-2", 480, 320),
+      },
+    ],
+  },
+  {
+    id: "madaum",
+    ownerId: "owner-2",
+    name: "Madaum Paddle and Pickle",
+    address: "Madaum Road, Barangay Madaum, Tagum City",
+    phone: "(084) 218-9026",
+    status: "active",
+    imageUrl: placeholderPhoto("madaum-paddle-pickle", 800, 500),
+    courts: [
+      {
+        id: "madaum-1",
+        name: "Court A",
+        surface: "Outdoor acrylic",
+        capacity: "Singles or doubles",
+        pricePerHour: 11,
+        status: "available",
+        availableSlots: ["6:00 AM", "8:30 AM", "3:30 PM", "6:30 PM"],
+        imageUrl: placeholderPhoto("madaum-1", 480, 320),
+      },
+    ],
+  },
+  {
+    id: "canocotan",
+    ownerId: "owner-1",
+    name: "Canocotan Pickleball Arena",
+    address: "Canocotan Road, Barangay Canocotan, Tagum City",
+    phone: "(084) 218-5178",
+    status: "active",
+    imageUrl: placeholderPhoto("canocotan-arena", 800, 500),
+    courts: [
+      {
+        id: "canocotan-1",
+        name: "Arena Court 1",
+        surface: "Indoor premium",
+        capacity: "Doubles preferred",
+        pricePerHour: 16,
+        status: "available",
+        availableSlots: ["7:30 AM", "10:00 AM", "1:30 PM", "6:00 PM"],
+        imageUrl: placeholderPhoto("canocotan-1", 480, 320),
+      },
+      {
+        id: "canocotan-2",
+        name: "Arena Court 2",
+        surface: "Indoor premium",
+        capacity: "Singles or doubles",
+        pricePerHour: 16,
+        status: "available",
+        availableSlots: ["9:00 AM", "12:30 PM", "4:30 PM", "8:00 PM"],
+        imageUrl: placeholderPhoto("canocotan-2", 480, 320),
       },
     ],
   },

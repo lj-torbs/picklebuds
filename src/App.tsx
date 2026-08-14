@@ -16,6 +16,7 @@ import { OwnerLoginPage } from "@/owner/pages/owner-login-page"
 import { OwnerTransactionsPage } from "@/owner/pages/owner-transactions-page"
 import { BookingPage } from "@/pages/booking-page"
 import { ForgotPasswordPage } from "@/pages/forgot-password-page"
+import { GymDetailPage } from "@/pages/gym-detail-page"
 import { LandingPage } from "@/pages/landing-page"
 import { LoginPage } from "@/pages/login-page"
 import { MyBookingsPage } from "@/pages/my-bookings-page"
@@ -32,6 +33,7 @@ export function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/booking" element={<BookingPage />} />
+        <Route path="/booking/:gymId" element={<GymDetailPage />} />
         <Route path="/my-bookings" element={<MyBookingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
