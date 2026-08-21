@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   Clock3,
   MapPin,
+  Package,
   Plus,
+  RefreshCw,
   RotateCcw,
   UserRound,
   XCircle,
@@ -34,6 +36,7 @@ import type {
 } from "@/lib/bookings-context"
 import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
+import { getRentalTotal } from "@/shared/lib/gyms-context"
 
 const rescheduleSlots = [
   "7:30 AM",
@@ -458,6 +461,33 @@ function BookingRow({
               <span className="text-muted-foreground">Expected players:</span>{" "}
               <span className="font-medium">{booking.participantCount}</span>
             </p>
+          ) : null}
+          {booking.rentals?.length ? (
+            <div className="grid gap-1 rounded-md border bg-muted/40 p-2.5">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Package className="size-3.5" aria-hidden="true" />
+                Gear rented
+              </span>
+              {booking.rentals.map((rental) => (
+                <div
+                  key={rental.itemId}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="min-w-0 truncate">
+                    {rental.quantity} × {rental.name}
+                  </span>
+                  <span className="shrink-0 font-medium">
+                    ${rental.pricePerSession * rental.quantity}
+                  </span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-3 border-t pt-1 text-xs text-muted-foreground">
+                <span>Gear subtotal</span>
+                <span className="font-medium text-foreground">
+                  ${getRentalTotal(booking.rentals)}
+                </span>
+              </div>
+            </div>
           ) : null}
           {booking.ownerName || booking.ownerEmail ? (
             <p className="text-sm">

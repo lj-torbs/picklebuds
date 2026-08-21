@@ -5,6 +5,7 @@ import {
   createMockPaymentReceipt,
   type PaymentReceipt,
 } from "@/shared/lib/payment-receipt"
+import type { BookingRental } from "@/shared/lib/gyms-context"
 
 export type TransactionStatus =
   "confirmed" | "pending" | "completed" | "cancelled"
@@ -23,7 +24,9 @@ export type Transaction = {
   slots: string[]
   bookingType: TransactionType
   participantCount: number
+  /** Court/venue charge plus any gear rental. */
   amount: number
+  rentals?: BookingRental[]
   paymentMethod: string
   paymentStatus: PaymentStatus
   status: TransactionStatus

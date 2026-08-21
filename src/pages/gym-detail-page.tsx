@@ -9,6 +9,9 @@ import {
   DollarSign,
   ImageUp,
   MapPin,
+  Minus,
+  Package,
+  Plus,
   Phone,
   QrCode,
   UserRound,
@@ -40,8 +43,16 @@ import {
   CourtStatusBadge,
   GymStatusBadge,
 } from "@/shared/components/gyms/gym-status-badge"
-import type { Court } from "@/shared/lib/gyms-context"
-import { useGyms } from "@/shared/lib/gyms-context"
+import type {
+  BookingRental,
+  Court,
+  RentalItem,
+} from "@/shared/lib/gyms-context"
+import {
+  getRentalTotal,
+  rentalGearCategoryLabels,
+  useGyms,
+} from "@/shared/lib/gyms-context"
 import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
 import { useTransactions } from "@/shared/lib/transactions-context"
 
@@ -92,6 +103,7 @@ export function GymDetailPage() {
   const {
     addBooking,
     getOpenPlaySeatsTaken,
+    getRentedQuantity,
     isWholeGymBooked,
     isGymFullyBooked,
     isSlotBooked,
@@ -121,11 +133,16 @@ export function GymDetailPage() {
     WholeGymBookingSelection[]
   >([])
   const [wholeGymParticipants, setWholeGymParticipants] = useState("16")
-  const [selectedPaymentOptionIndex, setSelectedPaymentOptionIndex] = useState(0)
+  const [selectedPaymentOptionIndex, setSelectedPaymentOptionIndex] =
+    useState(0)
   const [gcashReference, setGcashReference] = useState("")
   const [gcashAccountName, setGcashAccountName] = useState("")
   const [receiptFileName, setReceiptFileName] = useState("")
   const [receiptImageUrl, setReceiptImageUrl] = useState("")
+  const [wantsGearRental, setWantsGearRental] = useState(false)
+  const [rentalQuantities, setRentalQuantities] = useState<
+    Record<string, number>
+  >({})
 
   const selectedCourt: Court | undefined = useMemo(
     () =>
@@ -155,7 +172,8 @@ export function GymDetailPage() {
   const paymentSetup = paymentOptions[selectedPaymentOptionIndex]
   const wholeGymSetup = gym?.wholeGymBooking
   const wholeGymBookingEnabled =
-    wholeGymSetup?.enabled === true && selectedCourt?.bookingMode !== "open-play"
+    wholeGymSetup?.enabled === true &&
+    selectedCourt?.bookingMode !== "open-play"
   const bookingScope: BookingScope =
     wholeGymBookingEnabled && selectedBookingScope === "whole_gym"
       ? "whole_gym"
@@ -226,9 +244,7 @@ export function GymDetailPage() {
       return "closed"
     }
 
-    if (
-      isWholeGymBooked(gym!.id, day, time)
-    ) {
+    if (isWholeGymBooked(gym!.id, day, time)) {
       return "booked"
     }
 
@@ -244,7 +260,12 @@ export function GymDetailPage() {
     }
 
     if (selectedCourt.bookingMode === "open-play") {
-      const seatsTaken = getOpenPlaySeatsTaken(gym!.id, selectedCourt.id, day, time)
+      const seatsTaken = getOpenPlaySeatsTaken(
+        gym!.id,
+        selectedCourt.id,
+        day,
+        time
+      )
       const seatsLeft = (selectedCourt.openPlayCapacity ?? 0) - seatsTaken
       return seatsLeft <= 0 ? "booked" : "available"
     }
@@ -256,15 +277,17 @@ export function GymDetailPage() {
     return "available"
   }
 
-  function getWholeGymCellState(day: string, time: string): AvailabilityCellState {
+  function getWholeGymCellState(
+    day: string,
+    time: string
+  ): AvailabilityCellState {
     if (!wholeGymSetup || !wholeGymSetup.availableSlots.includes(time)) {
       return "closed"
     }
 
     if (
       wholeGymSelections.some(
-        (selection) =>
-          selection.date === day && selection.slots.includes(time)
+        (selection) => selection.date === day && selection.slots.includes(time)
       )
     ) {
       return "selected"
@@ -277,13 +300,22 @@ export function GymDetailPage() {
     return "available"
   }
 
-  function getCellLabel(day: string, time: string, state: AvailabilityCellState) {
+  function getCellLabel(
+    day: string,
+    time: string,
+    state: AvailabilityCellState
+  ) {
     if (!selectedCourt || selectedCourt.bookingMode !== "open-play") {
       return undefined
     }
 
     const openPlayCapacity = selectedCourt.openPlayCapacity ?? 0
-    const seatsTaken = getOpenPlaySeatsTaken(gym!.id, selectedCourt.id, day, time)
+    const seatsTaken = getOpenPlaySeatsTaken(
+      gym!.id,
+      selectedCourt.id,
+      day,
+      time
+    )
 
     if (state === "closed") {
       return "—"
@@ -371,6 +403,12 @@ export function GymDetailPage() {
       uploadedAt: new Date().toISOString(),
     }
 
+    // Each created booking carries the same gear and is charged one session of it.
+    const confirmedRentals = selectedRentals.length
+      ? selectedRentals
+      : undefined
+    const confirmedRentalPerSession = rentalPerSession
+
     if (isWholeGymScope) {
       if (
         !wholeGymSetup ||
@@ -392,6 +430,7 @@ export function GymDetailPage() {
           status: "pending",
           bookingType: "whole_gym",
           participantCount: wholeGymParticipantCount,
+          rentals: confirmedRentals,
           paymentReceipt,
           ownerName: user?.name ?? "Guest Player",
           ownerEmail: user?.email ?? "guest@example.com",
@@ -409,7 +448,10 @@ export function GymDetailPage() {
           slots: selection.slots,
           bookingType: "whole_gym",
           participantCount: wholeGymParticipantCount,
-          amount: wholeGymSetup.pricePerHour * selection.slots.length,
+          amount:
+            wholeGymSetup.pricePerHour * selection.slots.length +
+            confirmedRentalPerSession,
+          rentals: confirmedRentals,
           paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
           paymentStatus: "unpaid",
           status: "pending",
@@ -436,6 +478,7 @@ export function GymDetailPage() {
               ? "open_play"
               : "private",
           participantCount: 1,
+          rentals: confirmedRentals,
           paymentReceipt,
           ownerName: user?.name ?? "Guest Player",
           ownerEmail: user?.email ?? "guest@example.com",
@@ -452,12 +495,17 @@ export function GymDetailPage() {
           date: selection.date,
           slots: selection.slots,
           bookingType:
-            selection.court.bookingMode === "open-play" ? "open_play" : "private",
+            selection.court.bookingMode === "open-play"
+              ? "open_play"
+              : "private",
           participantCount: 1,
           amount:
             (selection.court.bookingMode === "open-play"
               ? getOpenPlayPricePerPlayer(selection.court)
-              : selection.court.pricePerHour) * selection.slots.length,
+              : selection.court.pricePerHour) *
+              selection.slots.length +
+            confirmedRentalPerSession,
+          rentals: confirmedRentals,
           paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
           paymentStatus: "unpaid",
           status: "pending",
@@ -484,9 +532,76 @@ export function GymDetailPage() {
   )
   const wholeGymEstimatedTotal =
     (wholeGymSetup?.pricePerHour ?? 0) * totalWholeGymSlots
-  const estimatedTotal = isWholeGymScope
+  const courtChargeTotal = isWholeGymScope
     ? wholeGymEstimatedTotal
     : courtEstimatedTotal
+
+  // Checkout creates one booking per selected date, and gear is priced per
+  // session — so renting a paddle across two dates is charged twice.
+  const sessionCount = isWholeGymScope
+    ? wholeGymSelections.length
+    : bookingSummary.length
+
+  const selectedDates = isWholeGymScope
+    ? wholeGymSelections.map((selection) => selection.date)
+    : bookingSummary.map((selection) => selection.date)
+
+  /** Units left for the busiest of the dates being booked. */
+  function getRemainingStock(item: RentalItem) {
+    if (!gym || selectedDates.length === 0) {
+      return item.quantityAvailable
+    }
+
+    const alreadyRented = Math.max(
+      ...selectedDates.map((date) => getRentedQuantity(gym.id, item.id, date))
+    )
+
+    return Math.max(0, item.quantityAvailable - alreadyRented)
+  }
+
+  function setRentalQuantity(item: RentalItem, quantity: number) {
+    const capped = Math.max(0, Math.min(quantity, getRemainingStock(item)))
+
+    setRentalQuantities((current) => ({ ...current, [item.id]: capped }))
+  }
+
+  function handleGearRentalToggle(next: boolean) {
+    setWantsGearRental(next)
+
+    // Opting back out drops any gear already picked, so the total resets.
+    if (!next) {
+      setRentalQuantities({})
+    }
+  }
+
+  const rentableItems = (gym?.rentalItems ?? []).filter(
+    (item) => item.status === "available" && item.quantityAvailable > 0
+  )
+
+  // Re-clamped on every render: picking gear before adding a date where stock
+  // is tighter would otherwise leave a quantity the venue can't actually fill.
+  const selectedRentals: BookingRental[] = (
+    wantsGearRental ? rentableItems : []
+  )
+    .map((item) => ({
+      item,
+      quantity: Math.min(
+        rentalQuantities[item.id] ?? 0,
+        getRemainingStock(item)
+      ),
+    }))
+    .filter(({ quantity }) => quantity > 0)
+    .map(({ item, quantity }) => ({
+      itemId: item.id,
+      name: item.name,
+      category: item.category,
+      pricePerSession: item.pricePerSession,
+      quantity,
+    }))
+
+  const rentalPerSession = getRentalTotal(selectedRentals)
+  const rentalTotal = rentalPerSession * sessionCount
+  const estimatedTotal = courtChargeTotal + rentalTotal
 
   return (
     <main className="min-h-svh bg-muted/30">
@@ -605,14 +720,14 @@ export function GymDetailPage() {
 
               <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
                 <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-primary">
-                        Booking option
-                      </p>
-                      <h2 className="text-xl font-semibold tracking-tight">
-                        Choose your booking type
-                      </h2>
-                    </div>
+                  <div>
+                    <p className="text-sm font-medium text-primary">
+                      Booking option
+                    </p>
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      Choose your booking type
+                    </h2>
+                  </div>
                   {wholeGymBookingEnabled ? (
                     <p className="text-sm text-muted-foreground">
                       Whole gym rental blocks all courts for the selected slot.
@@ -629,12 +744,12 @@ export function GymDetailPage() {
                         ? "border-primary bg-primary/5 ring-3 ring-primary/20"
                         : "bg-card hover:border-primary/50"
                     )}
-                    >
-                      <div className="font-medium">Court booking</div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Reserve a court through the standard booking flow.
-                      </p>
-                    </button>
+                  >
+                    <div className="font-medium">Court booking</div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Reserve a court through the standard booking flow.
+                    </p>
+                  </button>
                   {wholeGymBookingEnabled ? (
                     <button
                       type="button"
@@ -648,7 +763,8 @@ export function GymDetailPage() {
                     >
                       <div className="font-medium">Book the whole gym</div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Exclusive venue rental for organizations, events, or private groups.
+                        Exclusive venue rental for organizations, events, or
+                        private groups.
                       </p>
                     </button>
                   ) : null}
@@ -656,124 +772,129 @@ export function GymDetailPage() {
               </section>
 
               {!isWholeGymScope ? (
-              <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                      1
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-primary">Courts</p>
-                      <h2 className="text-xl font-semibold tracking-tight">
-                        Choose where you want to play
-                      </h2>
+                <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                        1
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-primary">
+                          Courts
+                        </p>
+                        <h2 className="text-xl font-semibold tracking-tight">
+                          Choose where you want to play
+                        </h2>
+                      </div>
                     </div>
+                    <p className="text-sm text-muted-foreground">
+                      Maintenance courts cannot be selected.
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Maintenance courts cannot be selected.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {gym.courts.map((court) => {
-                    const isSelected = court.id === selectedCourt?.id
-                    const selectedSlotCount = bookingSelections
-                      .filter((selection) => selection.courtId === court.id)
-                      .reduce(
-                        (total, selection) => total + selection.slots.length,
-                        0
-                      )
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {gym.courts.map((court) => {
+                      const isSelected = court.id === selectedCourt?.id
+                      const selectedSlotCount = bookingSelections
+                        .filter((selection) => selection.courtId === court.id)
+                        .reduce(
+                          (total, selection) => total + selection.slots.length,
+                          0
+                        )
 
-                    return (
-                      <button
-                        key={court.id}
-                        type="button"
-                        onClick={() => handleCourtChange(court)}
-                        disabled={court.status === "maintenance"}
-                        className={cn(
-                          "overflow-hidden rounded-lg border bg-card text-left shadow-xs transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-xs",
-                          isSelected &&
-                            "border-primary bg-primary/5 ring-3 ring-primary/20"
-                        )}
-                      >
-                        <GymPhoto
-                          src={court.imageUrl}
-                          alt={court.name}
-                          className="h-28 w-full"
-                        />
-                        <div className="p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="grid gap-1">
-                              <h3 className="leading-tight font-semibold">
-                                {court.name}
-                              </h3>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <CourtStatusBadge status={court.status} />
-                                <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                                  {court.bookingMode === "open-play"
-                                    ? "Open Play"
-                                    : "Private court"}
-                                </span>
+                      return (
+                        <button
+                          key={court.id}
+                          type="button"
+                          onClick={() => handleCourtChange(court)}
+                          disabled={court.status === "maintenance"}
+                          className={cn(
+                            "overflow-hidden rounded-lg border bg-card text-left shadow-xs transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-xs",
+                            isSelected &&
+                              "border-primary bg-primary/5 ring-3 ring-primary/20"
+                          )}
+                        >
+                          <GymPhoto
+                            src={court.imageUrl}
+                            alt={court.name}
+                            className="h-28 w-full"
+                          />
+                          <div className="p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="grid gap-1">
+                                <h3 className="leading-tight font-semibold">
+                                  {court.name}
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <CourtStatusBadge status={court.status} />
+                                  <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                    {court.bookingMode === "open-play"
+                                      ? "Open Play"
+                                      : "Private court"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {court.surface}
-                          </p>
-                          <div className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <UsersRound
-                                className="size-3.5"
-                                aria-hidden="true"
-                              />
-                              {court.bookingMode === "open-play" &&
-                              court.openPlayCapacity
-                                ? `${court.openPlayCapacity} players max`
-                                : court.capacity}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Clock3
-                                className="size-3.5"
-                                aria-hidden="true"
-                              />
-                              {court.availableSlots.length} slots/day
-                            </span>
-                          </div>
-                          <div className="mt-3 flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold">
-                              {court.bookingMode === "open-play" &&
-                              court.openPlayCapacity ? (
-                                <>
-                                  ${getOpenPlayPricePerPlayer(court).toFixed(2)}
-                                  <span className="font-normal text-muted-foreground">
-                                    /player
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  ${court.pricePerHour}
-                                  <span className="font-normal text-muted-foreground">
-                                    /hr
-                                  </span>
-                                </>
-                              )}
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {court.surface}
                             </p>
-                            {isSelected ? (
-                              <span className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">
-                                Selected
+                            <div className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <UsersRound
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                                {court.bookingMode === "open-play" &&
+                                court.openPlayCapacity
+                                  ? `${court.openPlayCapacity} players max`
+                                  : court.capacity}
                               </span>
-                            ) : selectedSlotCount > 0 ? (
-                              <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                                {selectedSlotCount} slot
-                                {selectedSlotCount === 1 ? "" : "s"}
+                              <span className="inline-flex items-center gap-1">
+                                <Clock3
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                                {court.availableSlots.length} slots/day
                               </span>
-                            ) : null}
+                            </div>
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold">
+                                {court.bookingMode === "open-play" &&
+                                court.openPlayCapacity ? (
+                                  <>
+                                    $
+                                    {getOpenPlayPricePerPlayer(court).toFixed(
+                                      2
+                                    )}
+                                    <span className="font-normal text-muted-foreground">
+                                      /player
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    ${court.pricePerHour}
+                                    <span className="font-normal text-muted-foreground">
+                                      /hr
+                                    </span>
+                                  </>
+                                )}
+                              </p>
+                              {isSelected ? (
+                                <span className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">
+                                  Selected
+                                </span>
+                              ) : selectedSlotCount > 0 ? (
+                                <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                                  {selectedSlotCount} slot
+                                  {selectedSlotCount === 1 ? "" : "s"}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </section>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
               ) : (
                 <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
                   <div className="flex flex-wrap items-end justify-between gap-3">
@@ -830,8 +951,8 @@ export function GymDetailPage() {
                         {isWholeGymScope
                           ? "Whole gym schedule"
                           : selectedCourt?.bookingMode === "open-play"
-                          ? `${selectedCourt?.name ?? "Court"} Open Play seats`
-                          : `${selectedCourt?.name ?? "Court"} schedule`}
+                            ? `${selectedCourt?.name ?? "Court"} Open Play seats`
+                            : `${selectedCourt?.name ?? "Court"} schedule`}
                       </h2>
                     </div>
                   </div>
@@ -839,15 +960,22 @@ export function GymDetailPage() {
                 </div>
                 {isWholeGymScope && wholeGymSetup ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
-                    Whole gym booking on Friday, August 21, 2026 onward is exclusive.
-                    If any court or Open Play session already exists on a slot, that slot is blocked here.
+                    Whole gym booking on Friday, August 21, 2026 onward is
+                    exclusive. If any court or Open Play session already exists
+                    on a slot, that slot is blocked here.
                   </div>
                 ) : null}
-                {!isWholeGymScope && isOpenPlayCourt && selectedCourt?.openPlayCapacity ? (
+                {!isWholeGymScope &&
+                isOpenPlayCourt &&
+                selectedCourt?.openPlayCapacity ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
-                    Open Play on this court allows up to {selectedCourt.openPlayCapacity} players per session.
-                    Each player pays ${getOpenPlayPricePerPlayer(selectedCourt).toFixed(2)} per slot.
-                    Session tiles show booked players as `current/capacity`, and once you select a slot the count updates to include your seat.
+                    Open Play on this court allows up to{" "}
+                    {selectedCourt.openPlayCapacity} players per session. Each
+                    player pays $
+                    {getOpenPlayPricePerPlayer(selectedCourt).toFixed(2)} per
+                    slot. Session tiles show booked players as
+                    `current/capacity`, and once you select a slot the count
+                    updates to include your seat.
                   </div>
                 ) : null}
                 {isWholeGymScope && wholeGymSetup ? (
@@ -855,7 +983,11 @@ export function GymDetailPage() {
                     days={week}
                     times={wholeGymSetup.availableSlots}
                     getState={getWholeGymCellState}
-                    onSelect={gym.status === "active" ? handleWholeGymCellSelect : undefined}
+                    onSelect={
+                      gym.status === "active"
+                        ? handleWholeGymCellSelect
+                        : undefined
+                    }
                   />
                 ) : selectedCourt ? (
                   <AvailabilityCalendar
@@ -923,7 +1055,7 @@ export function GymDetailPage() {
                       <span className="font-medium">
                         {isWholeGymScope
                           ? `All ${gym.courts.length} courts`
-                          : selectedCourt?.name ?? "-"}
+                          : (selectedCourt?.name ?? "-")}
                       </span>
                     </div>
                     {selectedCourt?.bookingMode === "open-play" &&
@@ -954,11 +1086,13 @@ export function GymDetailPage() {
                         {isWholeGymScope
                           ? "Selected whole gym slots"
                           : isOpenPlayCourt
-                          ? "Selected Open Play sessions"
-                          : "Selected courts and times"}
+                            ? "Selected Open Play sessions"
+                            : "Selected courts and times"}
                       </span>
                       <span className="text-xs font-medium text-muted-foreground">
-                        {isWholeGymScope ? totalWholeGymSlots : totalSelectedSlots}{" "}
+                        {isWholeGymScope
+                          ? totalWholeGymSlots
+                          : totalSelectedSlots}{" "}
                         slot
                         {(isWholeGymScope
                           ? totalWholeGymSlots
@@ -1014,10 +1148,11 @@ export function GymDetailPage() {
                             selection.court.openPlayCapacity ? (
                               <p className="mt-1 text-xs text-primary">
                                 1 seat at $
-                                {getOpenPlayPricePerPlayer(selection.court).toFixed(
-                                  2
-                                )}{" "}
-                                per slot · projected occupancy updates in the calendar
+                                {getOpenPlayPricePerPlayer(
+                                  selection.court
+                                ).toFixed(2)}{" "}
+                                per slot · projected occupancy updates in the
+                                calendar
                               </p>
                             ) : null}
                           </div>
@@ -1046,13 +1181,168 @@ export function GymDetailPage() {
                         placeholder="e.g. 20"
                       />
                       <p className="text-xs text-muted-foreground">
-                        This helps the owner understand the scale of the private organization booking.
+                        This helps the owner understand the scale of the private
+                        organization booking.
                       </p>
                     </div>
                   ) : null}
+                  {rentableItems.length > 0 ? (
+                    <div className="grid gap-3 rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="inline-flex items-center gap-1.5 text-sm font-medium">
+                            <Package className="size-4" aria-hidden="true" />
+                            Rent gear?
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {wantsGearRental
+                              ? "Charged per session, so it applies to each date you book."
+                              : "Add paddles, balls, or other equipment to this booking."}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={wantsGearRental ? "default" : "outline"}
+                            aria-pressed={wantsGearRental}
+                            onClick={() => handleGearRentalToggle(true)}
+                          >
+                            Yes
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={!wantsGearRental ? "default" : "outline"}
+                            aria-pressed={!wantsGearRental}
+                            onClick={() => handleGearRentalToggle(false)}
+                          >
+                            No
+                          </Button>
+                        </div>
+                      </div>
+
+                      {wantsGearRental ? (
+                        <>
+                          <div className="grid gap-2">
+                            {rentableItems.map((item) => {
+                              const remaining = getRemainingStock(item)
+                              const quantity = Math.min(
+                                rentalQuantities[item.id] ?? 0,
+                                remaining
+                              )
+                              const soldOut = remaining === 0
+
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="grid gap-2 rounded-md border bg-background p-2.5"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium">
+                                        {item.name}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {
+                                          rentalGearCategoryLabels[
+                                            item.category
+                                          ]
+                                        }{" "}
+                                        · ${item.pricePerSession} per session
+                                      </p>
+                                    </div>
+                                    <span
+                                      className={cn(
+                                        "shrink-0 text-xs",
+                                        soldOut
+                                          ? "text-destructive"
+                                          : "text-muted-foreground"
+                                      )}
+                                    >
+                                      {soldOut
+                                        ? "Fully booked"
+                                        : `${remaining} left`}
+                                    </span>
+                                  </div>
+
+                                  {item.description ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.description}
+                                    </p>
+                                  ) : null}
+
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                      <Button
+                                        type="button"
+                                        size="icon-sm"
+                                        variant="outline"
+                                        aria-label={`Remove one ${item.name}`}
+                                        disabled={quantity === 0}
+                                        onClick={() =>
+                                          setRentalQuantity(item, quantity - 1)
+                                        }
+                                      >
+                                        <Minus
+                                          className="size-4"
+                                          aria-hidden="true"
+                                        />
+                                      </Button>
+                                      <span className="w-8 text-center text-sm font-medium tabular-nums">
+                                        {quantity}
+                                      </span>
+                                      <Button
+                                        type="button"
+                                        size="icon-sm"
+                                        variant="outline"
+                                        aria-label={`Add one ${item.name}`}
+                                        disabled={
+                                          soldOut || quantity >= remaining
+                                        }
+                                        onClick={() =>
+                                          setRentalQuantity(item, quantity + 1)
+                                        }
+                                      >
+                                        <Plus
+                                          className="size-4"
+                                          aria-hidden="true"
+                                        />
+                                      </Button>
+                                    </div>
+                                    {quantity > 0 ? (
+                                      <span className="text-sm font-medium text-primary">
+                                        ${item.pricePerSession * quantity}
+                                        <span className="text-xs font-normal text-muted-foreground">
+                                          {" "}
+                                          / session
+                                        </span>
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {rentalPerSession > 0 ? (
+                            <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+                              ${rentalPerSession} of gear per session
+                              {sessionCount > 1
+                                ? ` × ${sessionCount} dates = $${rentalTotal}`
+                                : null}
+                            </p>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <div className="grid gap-3 rounded-lg border p-3">
                     <div>
-                      <h3 className="text-sm font-medium">Venue payment methods</h3>
+                      <h3 className="text-sm font-medium">
+                        Venue payment methods
+                      </h3>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Pick the best payment option for you, send the payment,
                         then upload your receipt for owner confirmation.
@@ -1061,17 +1351,24 @@ export function GymDetailPage() {
                     {paymentSetup ? (
                       <>
                         <div className="grid gap-2">
-                          <Label htmlFor="payment-method">Select payment method</Label>
+                          <Label htmlFor="payment-method">
+                            Select payment method
+                          </Label>
                           <select
                             id="payment-method"
                             value={String(selectedPaymentOptionIndex)}
                             onChange={(event) =>
-                              setSelectedPaymentOptionIndex(Number(event.target.value))
+                              setSelectedPaymentOptionIndex(
+                                Number(event.target.value)
+                              )
                             }
                             className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                           >
                             {paymentOptions.map((option, index) => (
-                              <option key={`${option.provider}-${option.accountNumber}-${index}`} value={index}>
+                              <option
+                                key={`${option.provider}-${option.accountNumber}-${index}`}
+                                value={index}
+                              >
                                 {option.provider} - {option.accountNumber}
                               </option>
                             ))}
@@ -1129,7 +1426,9 @@ export function GymDetailPage() {
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="payment-receipt">Receipt screenshot</Label>
+                          <Label htmlFor="payment-receipt">
+                            Receipt screenshot
+                          </Label>
                           <Input
                             id="payment-receipt"
                             type="file"
@@ -1141,15 +1440,18 @@ export function GymDetailPage() {
                           {receiptFileName ? (
                             <div className="flex items-center gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
                               <ImageUp className="size-4" aria-hidden="true" />
-                              <span className="truncate">{receiptFileName}</span>
+                              <span className="truncate">
+                                {receiptFileName}
+                              </span>
                             </div>
                           ) : null}
                         </div>
                       </>
                     ) : (
                       <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
-                        This venue has not configured any payment methods yet. Booking
-                        submission is disabled until the owner sets one up.
+                        This venue has not configured any payment methods yet.
+                        Booking submission is disabled until the owner sets one
+                        up.
                       </div>
                     )}
                   </div>
@@ -1167,16 +1469,36 @@ export function GymDetailPage() {
                       {isWholeGymScope
                         ? `${totalWholeGymSlots} whole gym slot${totalWholeGymSlots === 1 ? "" : "s"} for ${wholeGymParticipantCountValid ? wholeGymParticipantCount : 0} player${wholeGymParticipantCount === 1 ? "" : "s"}`
                         : isOpenPlayCourt
-                        ? `${totalSelectedSlots} Open Play seat${totalSelectedSlots === 1 ? "" : "s"} selected`
-                        : `${totalSelectedSlots} slot${totalSelectedSlots === 1 ? "" : "s"} across ${bookingSummary.length} court/date${bookingSummary.length === 1 ? "" : "s"}`}
+                          ? `${totalSelectedSlots} Open Play seat${totalSelectedSlots === 1 ? "" : "s"} selected`
+                          : `${totalSelectedSlots} slot${totalSelectedSlots === 1 ? "" : "s"} across ${bookingSummary.length} court/date${bookingSummary.length === 1 ? "" : "s"}`}
                     </p>
+                    {rentalTotal > 0 ? (
+                      <div className="grid gap-1 border-t border-primary/20 pt-2 text-xs text-primary/80">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Court charge</span>
+                          <span className="font-medium">
+                            ${courtChargeTotal}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>
+                            Gear rental
+                            {sessionCount > 1
+                              ? ` (${sessionCount} sessions)`
+                              : null}
+                          </span>
+                          <span className="font-medium">${rentalTotal}</span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                   <Button
                     className="w-full"
                     onClick={handleConfirmBooking}
                     disabled={
                       (isWholeGymScope
-                        ? totalWholeGymSlots === 0 || !wholeGymParticipantCountValid
+                        ? totalWholeGymSlots === 0 ||
+                          !wholeGymParticipantCountValid
                         : totalSelectedSlots === 0) ||
                       gym.status !== "active" ||
                       !paymentSetup ||

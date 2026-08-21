@@ -7,6 +7,7 @@ import {
   Check,
   CreditCard,
   ImageUp,
+  Package,
   Trash2,
   TriangleAlert,
   Users,
@@ -18,6 +19,12 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
+import { RentalGearEditor } from "@/shared/components/gyms/rental-gear-editor"
+import type { RentalItemDraft } from "@/shared/components/gyms/rental-gear-utils"
+import {
+  rentalDraftIsComplete,
+  rentalDraftIsEmpty,
+} from "@/shared/components/gyms/rental-gear-utils"
 import { TimeRangeEditor } from "@/shared/components/gyms/time-range-editor"
 import {
   createTimeRangeDrafts,
@@ -27,6 +34,7 @@ import type {
   GymPaymentSetup,
   GymStatus,
   PaymentProvider,
+  RentalItem,
 } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 
@@ -92,6 +100,14 @@ const steps = [
     description:
       "Optional: let organizations rent the entire venue instead of single courts.",
     icon: Users,
+  },
+  {
+    id: "gear",
+    title: "Gear rental",
+    shortTitle: "Gear",
+    description:
+      "Optional: paddles, balls, and other equipment players can add to a booking.",
+    icon: Package,
   },
 ] as const
 
@@ -177,6 +193,18 @@ export function OwnerGymFormPage() {
     createTimeRangeDrafts(editingGym?.wholeGymBooking?.availableSlots ?? [])
   )
 
+  const [rentalItems, setRentalItems] = useState<RentalItemDraft[]>(() =>
+    (editingGym?.rentalItems ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      pricePerSession: String(item.pricePerSession),
+      quantityAvailable: String(item.quantityAvailable),
+      status: item.status,
+      description: item.description ?? "",
+    }))
+  )
+
   // An owner opening someone else's gym, or a stale /edit link, goes back to the list.
   if (!canEdit) {
     return <Navigate to="/owner/gyms" replace />
@@ -192,6 +220,11 @@ export function OwnerGymFormPage() {
     (option) => !paymentIsComplete(option) && !paymentIsEmpty(option)
   ).length
   const completePayments = paymentOptions.filter(paymentIsComplete).length
+
+  const droppedRentals = rentalItems.filter(
+    (item) => !rentalDraftIsComplete(item) && !rentalDraftIsEmpty(item)
+  ).length
+  const completeRentals = rentalItems.filter(rentalDraftIsComplete).length
 
   const wholeGymPrice = Number(wholeGym.pricePerHour)
   const normalizedWholeGymSlots = normalizeTimeRanges(wholeGymTimeRanges)
@@ -247,6 +280,21 @@ export function OwnerGymFormPage() {
             .replace(/[^a-z0-9]+/g, "-")}-qr.png`,
       }))
 
+    const normalizedRentalItems: RentalItem[] = rentalItems
+      .filter(rentalDraftIsComplete)
+      .map((item, index) => ({
+        // Existing items keep their id so bookings that reference them still line up.
+        id:
+          item.id ||
+          `${details.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-gear-${index}-${Date.now().toString(36)}`,
+        name: item.name.trim(),
+        category: item.category,
+        pricePerSession: Number(item.pricePerSession),
+        quantityAvailable: Number(item.quantityAvailable),
+        status: item.status,
+        description: item.description.trim() || undefined,
+      }))
+
     const values = {
       name: details.name.trim(),
       address: details.address.trim(),
@@ -254,6 +302,7 @@ export function OwnerGymFormPage() {
       imageUrl: details.imageUrl || undefined,
       status: details.status,
       paymentOptions: normalizedPaymentOptions,
+      rentalItems: normalizedRentalItems,
       wholeGymBooking: wholeGymIsComplete
         ? {
             enabled: true,
@@ -811,12 +860,35 @@ export function OwnerGymFormPage() {
           </div>
         ) : null}
 
+        {stepIndex === 3 ? (
+          <div className="grid gap-4">
+            {droppedRentals > 0 ? (
+              <p className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                <TriangleAlert
+                  className="mt-px size-4 shrink-0"
+                  aria-hidden="true"
+                />
+                <span>
+                  {droppedRentals} gear{" "}
+                  {droppedRentals === 1 ? "item is" : "items are"} incomplete and{" "}
+                  {droppedRentals === 1 ? "won't" : "won't"} be saved.
+                </span>
+              </p>
+            ) : null}
+
+            <RentalGearEditor items={rentalItems} onChange={setRentalItems} />
+          </div>
+        ) : null}
+
         <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-muted-foreground">
             {completePayments > 0
               ? `${completePayments} payment ${completePayments === 1 ? "method" : "methods"} ready`
               : "No payment methods set up yet"}
             {wholeGymIsComplete ? " · whole gym booking on" : null}
+            {completeRentals > 0
+              ? ` · ${completeRentals} gear ${completeRentals === 1 ? "item" : "items"}`
+              : null}
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row">

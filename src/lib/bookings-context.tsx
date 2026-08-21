@@ -5,6 +5,7 @@ import {
   createMockPaymentReceipt,
   type PaymentReceipt,
 } from "@/shared/lib/payment-receipt"
+import type { BookingRental } from "@/shared/lib/gyms-context"
 
 export type BookingStatus = "confirmed" | "pending" | "completed" | "cancelled"
 export type PasaloStatus = "none" | "open" | "pending" | "completed" | "cancelled"
@@ -33,11 +34,13 @@ export type Booking = {
   status: BookingStatus
   bookingType: BookingType
   participantCount: number
+  rentals?: BookingRental[]
   paymentReceipt?: PaymentReceipt
   ownerName?: string
   ownerEmail?: string
   pasalo?: PasaloOffer
 }
+
 
 type NewBooking = Omit<Booking, "id" | "status"> & { status?: BookingStatus }
 type PasaloClaimInput = {
@@ -61,6 +64,7 @@ type BookingsContextValue = {
     date: string,
     slot: string
   ) => number
+  getRentedQuantity: (gymId: string, itemId: string, date: string) => number
   isWholeGymBooked: (gymId: string, date: string, slot: string) => boolean
   isGymFullyBooked: (gymId: string, date: string, slot: string) => boolean
   isSlotBooked: (
@@ -352,6 +356,28 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
     []
   )
 
+  // Gear is stocked per venue, so the same item rented on one date is free
+  // again the next. Counts across every booking at this gym on that date.
+  const getRentedQuantity = React.useCallback(
+    (gymId: string, itemId: string, date: string) =>
+      bookings
+        .filter(
+          (booking) =>
+            booking.gymId === gymId &&
+            booking.date === date &&
+            booking.status !== "cancelled"
+        )
+        .reduce(
+          (total, booking) =>
+            total +
+            (booking.rentals ?? [])
+              .filter((rental) => rental.itemId === itemId)
+              .reduce((sum, rental) => sum + rental.quantity, 0),
+          0
+        ),
+    [bookings]
+  )
+
   const isWholeGymBooked = React.useCallback(
     (gymId: string, date: string, slot: string) =>
       bookings.some(
@@ -420,6 +446,7 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
       cancelPasaloOffer,
       claimPasalo,
       getOpenPlaySeatsTaken,
+      getRentedQuantity,
       isWholeGymBooked,
       isGymFullyBooked,
       isSlotBooked,
@@ -434,6 +461,7 @@ export function BookingsProvider({ children }: { children: React.ReactNode }) {
       cancelPasaloOffer,
       claimPasalo,
       getOpenPlaySeatsTaken,
+      getRentedQuantity,
       isWholeGymBooked,
       isGymFullyBooked,
       isSlotBooked,

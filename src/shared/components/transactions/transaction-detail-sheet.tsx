@@ -5,6 +5,7 @@ import {
   Image,
   Mail,
   MapPin,
+  Package,
   Receipt,
   User,
 } from "lucide-react"
@@ -13,6 +14,7 @@ import {
   PaymentStatusBadge,
   TransactionStatusBadge,
 } from "@/shared/components/transactions/transaction-status-badge"
+import { getRentalTotal } from "@/shared/lib/gyms-context"
 import type { Transaction } from "@/shared/lib/transactions-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -115,6 +117,34 @@ export function TransactionDetailSheet({
                   </span>
                 </div>
               </div>
+
+              {transaction.rentals?.length ? (
+                <div className="grid gap-1.5 rounded-lg border p-3">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Package className="size-3.5" aria-hidden="true" />
+                    Gear to hand over
+                  </span>
+                  {transaction.rentals.map((rental) => (
+                    <div
+                      key={rental.itemId}
+                      className="flex items-center justify-between gap-3 text-sm"
+                    >
+                      <span className="min-w-0 truncate">
+                        {rental.quantity} × {rental.name}
+                      </span>
+                      <span className="shrink-0 font-medium">
+                        ${rental.pricePerSession * rental.quantity}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-3 border-t pt-1.5 text-xs text-muted-foreground">
+                    <span>Included in the amount above</span>
+                    <span className="font-medium text-foreground">
+                      ${getRentalTotal(transaction.rentals)}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-800 dark:text-yellow-300">
                 <div className="inline-flex items-start gap-2">

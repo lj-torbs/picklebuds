@@ -24,6 +24,51 @@ export type WholeGymBookingSetup = {
   notes?: string
 }
 
+export type RentalGearCategory = "paddle" | "ball" | "shoes" | "net" | "other"
+export type RentalItemStatus = "available" | "unavailable"
+
+/**
+ * Gear an owner rents out alongside a court. Priced per session, so a player
+ * booking three dates is charged for three sessions of the same paddle.
+ */
+export type RentalItem = {
+  id: string
+  name: string
+  category: RentalGearCategory
+  pricePerSession: number
+  quantityAvailable: number
+  status: RentalItemStatus
+  description?: string
+}
+
+/**
+ * A rental item as captured on a booking. Name and price are copied off the
+ * gym's RentalItem at checkout, so the booking still reads correctly if the
+ * owner later renames or reprices the item.
+ */
+export type BookingRental = {
+  itemId: string
+  name: string
+  category: RentalGearCategory
+  pricePerSession: number
+  quantity: number
+}
+
+export function getRentalTotal(rentals: BookingRental[] | undefined) {
+  return (rentals ?? []).reduce(
+    (total, rental) => total + rental.pricePerSession * rental.quantity,
+    0
+  )
+}
+
+export const rentalGearCategoryLabels: Record<RentalGearCategory, string> = {
+  paddle: "Paddle",
+  ball: "Ball",
+  shoes: "Shoes",
+  net: "Net",
+  other: "Other",
+}
+
 export type Court = {
   id: string
   name: string
@@ -47,11 +92,13 @@ export type Gym = {
   imageUrl?: string
   paymentOptions: GymPaymentSetup[]
   wholeGymBooking?: WholeGymBookingSetup
+  rentalItems: RentalItem[]
   courts: Court[]
 }
 
-export type NewGym = Omit<Gym, "id" | "courts" | "status"> & {
+export type NewGym = Omit<Gym, "id" | "courts" | "status" | "rentalItems"> & {
   status?: GymStatus
+  rentalItems?: RentalItem[]
 }
 export type GymUpdate = Partial<Omit<Gym, "id" | "courts">>
 
@@ -103,6 +150,43 @@ const initialGyms: Gym[] = [
       availableSlots: ["8:00 AM", "10:00 AM", "1:00 PM", "4:00 PM", "7:00 PM"],
       notes: "Best for company sports days, school events, or private club sessions.",
     },
+    rentalItems: [
+      {
+        id: "northside-paddle-std",
+        name: "Recreational paddle",
+        category: "paddle",
+        pricePerSession: 3,
+        quantityAvailable: 12,
+        status: "available",
+        description: "Composite paddle with cushioned grip. Good for first-timers.",
+      },
+      {
+        id: "northside-paddle-pro",
+        name: "Carbon fiber paddle",
+        category: "paddle",
+        pricePerSession: 6,
+        quantityAvailable: 4,
+        status: "available",
+        description: "Tournament-grade paddle for players who want more control.",
+      },
+      {
+        id: "northside-balls",
+        name: "Outdoor ball set (3 pcs)",
+        category: "ball",
+        pricePerSession: 2,
+        quantityAvailable: 20,
+        status: "available",
+      },
+      {
+        id: "northside-shoes",
+        name: "Court shoes",
+        category: "shoes",
+        pricePerSession: 4,
+        quantityAvailable: 8,
+        status: "available",
+        description: "Sizes 6-11 available. Ask the front desk on arrival.",
+      },
+    ],
     courts: [
       {
         id: "northside-a",
@@ -171,6 +255,24 @@ const initialGyms: Gym[] = [
       availableSlots: ["7:30 AM", "12:00 PM", "3:30 PM", "6:00 PM"],
       notes: "Single-court venue. Whole-gym booking reserves the full site for the selected slot.",
     },
+    rentalItems: [
+      {
+        id: "riverside-paddle",
+        name: "Starter paddle",
+        category: "paddle",
+        pricePerSession: 3,
+        quantityAvailable: 6,
+        status: "available",
+      },
+      {
+        id: "riverside-balls",
+        name: "Indoor ball set (3 pcs)",
+        category: "ball",
+        pricePerSession: 2,
+        quantityAvailable: 10,
+        status: "available",
+      },
+    ],
     courts: [
       {
         id: "riverside-main",
@@ -201,6 +303,33 @@ const initialGyms: Gym[] = [
         instructions: "Upload the full Maya receipt with the transaction reference.",
         qrCodeImageUrl: placeholderQr("Mankilam Maya"),
         qrCodeFileName: "mankilam-maya-qr.png",
+      },
+    ],
+    rentalItems: [
+      {
+        id: "central-paddle",
+        name: "Club paddle",
+        category: "paddle",
+        pricePerSession: 4,
+        quantityAvailable: 10,
+        status: "available",
+      },
+      {
+        id: "central-balls",
+        name: "Ball set (3 pcs)",
+        category: "ball",
+        pricePerSession: 2,
+        quantityAvailable: 15,
+        status: "available",
+      },
+      {
+        id: "central-net",
+        name: "Portable net",
+        category: "net",
+        pricePerSession: 8,
+        quantityAvailable: 2,
+        status: "unavailable",
+        description: "Currently out for repair.",
       },
     ],
     courts: [
@@ -260,6 +389,24 @@ const initialGyms: Gym[] = [
       availableSlots: ["8:00 AM", "10:30 AM", "3:00 PM", "6:00 PM"],
       notes: "Includes exclusive use of all courts under one booking reference.",
     },
+    rentalItems: [
+      {
+        id: "visayan-paddle",
+        name: "Recreational paddle",
+        category: "paddle",
+        pricePerSession: 3,
+        quantityAvailable: 8,
+        status: "available",
+      },
+      {
+        id: "visayan-balls",
+        name: "Ball set (3 pcs)",
+        category: "ball",
+        pricePerSession: 1,
+        quantityAvailable: 12,
+        status: "available",
+      },
+    ],
     courts: [
       {
         id: "visayan-village-1",
@@ -302,6 +449,24 @@ const initialGyms: Gym[] = [
         instructions: "Use this venue QR and keep the screenshot visible when uploading proof.",
         qrCodeImageUrl: placeholderQr("Magugpo East QR"),
         qrCodeFileName: "magugpo-east-qr.png",
+      },
+    ],
+    rentalItems: [
+      {
+        id: "magugpo-paddle",
+        name: "Training paddle",
+        category: "paddle",
+        pricePerSession: 3,
+        quantityAvailable: 14,
+        status: "available",
+      },
+      {
+        id: "magugpo-balls",
+        name: "Indoor ball set (3 pcs)",
+        category: "ball",
+        pricePerSession: 2,
+        quantityAvailable: 18,
+        status: "available",
       },
     ],
     courts: [
@@ -355,6 +520,16 @@ const initialGyms: Gym[] = [
         qrCodeFileName: "madaum-maribank-qr.png",
       },
     ],
+    rentalItems: [
+      {
+        id: "madaum-paddle",
+        name: "Paddle rental",
+        category: "paddle",
+        pricePerSession: 2,
+        quantityAvailable: 6,
+        status: "available",
+      },
+    ],
     courts: [
       {
         id: "madaum-1",
@@ -402,6 +577,32 @@ const initialGyms: Gym[] = [
       availableSlots: ["9:00 AM", "12:30 PM", "4:30 PM", "8:00 PM"],
       notes: "Arena rental for leagues, company socials, and private tournaments.",
     },
+    rentalItems: [
+      {
+        id: "canocotan-paddle",
+        name: "Arena paddle",
+        category: "paddle",
+        pricePerSession: 4,
+        quantityAvailable: 10,
+        status: "available",
+      },
+      {
+        id: "canocotan-balls",
+        name: "Ball set (3 pcs)",
+        category: "ball",
+        pricePerSession: 2,
+        quantityAvailable: 16,
+        status: "available",
+      },
+      {
+        id: "canocotan-shoes",
+        name: "Court shoes",
+        category: "shoes",
+        pricePerSession: 4,
+        quantityAvailable: 5,
+        status: "available",
+      },
+    ],
     courts: [
       {
         id: "canocotan-1",
@@ -447,6 +648,7 @@ export function GymsProvider({ children }: { children: React.ReactNode }) {
       ...gym,
       id: `${slugify(gym.name)}-${Date.now().toString(36)}`,
       status: gym.status ?? "active",
+      rentalItems: gym.rentalItems ?? [],
       courts: [],
     }
     setGyms((current) => [created, ...current])

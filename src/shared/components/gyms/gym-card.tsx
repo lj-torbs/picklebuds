@@ -1,5 +1,14 @@
 import { useState } from "react"
-import { Building2, Pencil, Phone, Plus, QrCode, Trash2, Wallet } from "lucide-react"
+import {
+  Building2,
+  Package,
+  Pencil,
+  Phone,
+  Plus,
+  QrCode,
+  Trash2,
+  Wallet,
+} from "lucide-react"
 
 import {
   CourtStatusBadge,
@@ -204,6 +213,46 @@ export function GymCard({
           ) : (
             <p className="text-sm text-muted-foreground">
               Whole gym booking is currently disabled for this venue.
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
+          <div className="flex items-center gap-2">
+            <Package className="size-4 text-muted-foreground" aria-hidden="true" />
+            <span className="text-sm font-medium">Gear rental</span>
+          </div>
+          {gym.rentalItems.length > 0 ? (
+            <div className="grid gap-1 text-sm">
+              {gym.rentalItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="min-w-0 truncate">
+                    {item.name}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {item.quantityAvailable} in stock
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-medium">
+                    ${item.pricePerSession}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      /session
+                    </span>
+                    {item.status === "unavailable" ? (
+                      <span className="ml-1.5 text-xs font-normal text-destructive">
+                        off
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No gear listed. Players can only book courts at this venue.
             </p>
           )}
         </div>
