@@ -14,7 +14,21 @@ import {
 const pageTitles: Record<string, string> = {
   "/owner/dashboard": "Dashboard",
   "/owner/gyms": "My Gyms",
+  "/owner/gyms/new": "Add Gym",
   "/owner/transactions": "Transactions",
+}
+
+function resolveTitle(pathname: string) {
+  if (pageTitles[pathname]) {
+    return pageTitles[pathname]
+  }
+
+  // /owner/gyms/:gymId/edit
+  if (pathname.startsWith("/owner/gyms/") && pathname.endsWith("/edit")) {
+    return "Edit Gym"
+  }
+
+  return "Owner"
 }
 
 export function OwnerShell() {
@@ -22,7 +36,7 @@ export function OwnerShell() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const title = pageTitles[location.pathname] ?? "Owner"
+  const title = resolveTitle(location.pathname)
 
   function handleLogout() {
     logout()
@@ -35,7 +49,7 @@ export function OwnerShell() {
         <OwnerSidebar />
       </aside>
 
-      <div className="flex min-h-svh flex-col">
+      <div className="flex min-w-0 min-h-svh flex-col">
         <header className="flex h-16 items-center gap-3 border-b bg-background px-4 sm:px-6">
           <Sheet>
             <SheetTrigger

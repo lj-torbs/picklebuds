@@ -1,67 +1,30 @@
 import { useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Plus } from "lucide-react"
 
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { CourtFormSheet } from "@/shared/components/gyms/court-form-sheet"
 import { GymCard } from "@/shared/components/gyms/gym-card"
-import { GymFormSheet } from "@/shared/components/gyms/gym-form-sheet"
-import type { Court, CourtStatus, Gym, GymStatus } from "@/shared/lib/gyms-context"
+import type { Court, CourtStatus } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 
 export function OwnerGymsPage() {
   const { owner } = useOwnerAuth()
-  const { gyms, updateGym, setGymStatus, addCourt, updateCourt, setCourtStatus, removeCourt } =
+  const { gyms, setGymStatus, addCourt, updateCourt, setCourtStatus, removeCourt } =
     useGyms()
   const toast = useToast()
+  const navigate = useNavigate()
 
   const ownedGyms = useMemo(
     () => gyms.filter((gym) => gym.ownerId === owner?.id),
     [gyms, owner]
   )
 
-  const [gymFormOpen, setGymFormOpen] = useState(false)
-  const [editingGym, setEditingGym] = useState<Gym | null>(null)
-
   const [courtFormOpen, setCourtFormOpen] = useState(false)
   const [activeGymId, setActiveGymId] = useState<string | null>(null)
   const [editingCourt, setEditingCourt] = useState<Court | null>(null)
-
-  function openAddGym() {
-    setEditingGym(null)
-    setGymFormOpen(true)
-  }
-
-  function handleSaveGym(values: {
-    name: string
-    address: string
-    phone: string
-    imageUrl?: string
-    status: GymStatus
-    paymentOptions: Gym["paymentOptions"]
-    wholeGymBooking?: Gym["wholeGymBooking"]
-  }) {
-    if (!owner?.id) {
-      return
-    }
-
-    if (editingGym) {
-      updateGym(editingGym.id, values)
-      toast.add({
-        title: "Gym updated",
-        description: `${values.name} has been updated.`,
-        type: "success",
-      })
-    } else {
-      addGym({ ...values, ownerId: owner.id })
-      toast.add({
-        title: "Gym added",
-        description: `${values.name} is now part of your venues.`,
-        type: "success",
-      })
-    }
-  }
 
   function openAddCourt(gymId: string) {
     setActiveGymId(gymId)
@@ -121,7 +84,7 @@ export function OwnerGymsPage() {
             availability across every venue you operate.
           </p>
         </div>
-        <Button type="button" onClick={openAddGym}>
+        <Button type="button" onClick={() => navigate("/owner/gyms/new")}>
           <Plus className="size-4" aria-hidden="true" />
           Add gym
         </Button>
@@ -137,7 +100,7 @@ export function OwnerGymsPage() {
             </p>
           </div>
           <div className="flex justify-center">
-            <Button type="button" onClick={openAddGym}>
+            <Button type="button" onClick={() => navigate("/owner/gyms/new")}>
               <Plus className="size-4" aria-hidden="true" />
               Add gym
             </Button>
@@ -149,10 +112,9 @@ export function OwnerGymsPage() {
             <GymCard
               key={gym.id}
               gym={gym}
-              onEditGym={(current) => {
-                setEditingGym(current)
-                setGymFormOpen(true)
-              }}
+              onEditGym={(current) =>
+                navigate(`/owner/gyms/${current.id}/edit`)
+              }
               onToggleGymStatus={(current) =>
                 setGymStatus(
                   current.id,
@@ -177,13 +139,6 @@ export function OwnerGymsPage() {
           ))}
         </div>
       )}
-
-      <GymFormSheet
-        gym={editingGym}
-        open={gymFormOpen}
-        onOpenChange={setGymFormOpen}
-        onSave={handleSaveGym}
-      />
 
       <CourtFormSheet
         court={editingCourt}
