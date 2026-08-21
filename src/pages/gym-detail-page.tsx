@@ -10,6 +10,7 @@ import {
   ImageUp,
   MapPin,
   Phone,
+  QrCode,
   UserRound,
   UsersRound,
 } from "lucide-react"
@@ -46,8 +47,15 @@ import { useTransactions } from "@/shared/lib/transactions-context"
 
 const DAYS_IN_VIEW = 7
 
+type BookingScope = "court" | "whole_gym"
+
 type CourtBookingSelection = {
   courtId: string
+  date: string
+  slots: string[]
+}
+
+type WholeGymBookingSelection = {
   date: string
   slots: string[]
 }
@@ -68,12 +76,26 @@ function buildWeek(startingFrom = new Date()) {
   })
 }
 
+function getOpenPlayPricePerPlayer(court: Court) {
+  if (!court.openPlayCapacity || court.openPlayCapacity <= 0) {
+    return court.pricePerHour
+  }
+
+  return court.pricePerHour / court.openPlayCapacity
+}
+
 export function GymDetailPage() {
   const { gymId } = useParams<{ gymId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { gyms } = useGyms()
-  const { addBooking, isSlotBooked } = useBookings()
+  const {
+    addBooking,
+    getOpenPlaySeatsTaken,
+    isWholeGymBooked,
+    isGymFullyBooked,
+    isSlotBooked,
+  } = useBookings()
   const { addTransaction } = useTransactions()
   const { user } = useAuth()
   const toast = useToast()
@@ -88,9 +110,18 @@ export function GymDetailPage() {
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(
     () => searchParams.get("court") ?? gym?.courts[0]?.id
   )
+  const [selectedBookingScope, setSelectedBookingScope] =
+    useState<BookingScope>(() =>
+      searchParams.get("scope") === "whole-gym" ? "whole_gym" : "court"
+    )
   const [bookingSelections, setBookingSelections] = useState<
     CourtBookingSelection[]
   >([])
+  const [wholeGymSelections, setWholeGymSelections] = useState<
+    WholeGymBookingSelection[]
+  >([])
+  const [wholeGymParticipants, setWholeGymParticipants] = useState("16")
+  const [selectedPaymentOptionIndex, setSelectedPaymentOptionIndex] = useState(0)
   const [gcashReference, setGcashReference] = useState("")
   const [gcashAccountName, setGcashAccountName] = useState("")
   const [receiptFileName, setReceiptFileName] = useState("")
@@ -119,6 +150,17 @@ export function GymDetailPage() {
         ),
     [bookingSelections, gym]
   )
+  const isOpenPlayCourt = selectedCourt?.bookingMode === "open-play"
+  const paymentOptions = gym?.paymentOptions ?? []
+  const paymentSetup = paymentOptions[selectedPaymentOptionIndex]
+  const wholeGymSetup = gym?.wholeGymBooking
+  const wholeGymBookingEnabled =
+    wholeGymSetup?.enabled === true && selectedCourt?.bookingMode !== "open-play"
+  const bookingScope: BookingScope =
+    wholeGymBookingEnabled && selectedBookingScope === "whole_gym"
+      ? "whole_gym"
+      : "court"
+  const isWholeGymScope = bookingScope === "whole_gym"
 
   const totalSelectedSlots = useMemo(
     () =>
@@ -128,11 +170,22 @@ export function GymDetailPage() {
       ),
     [bookingSummary]
   )
+  const totalWholeGymSlots = useMemo(
+    () =>
+      wholeGymSelections.reduce(
+        (total, selection) => total + selection.slots.length,
+        0
+      ),
+    [wholeGymSelections]
+  )
 
   const receiptIsComplete =
     gcashReference.trim().length >= 6 &&
     gcashAccountName.trim().length > 0 &&
     receiptImageUrl.length > 0
+  const wholeGymParticipantCount = Number(wholeGymParticipants)
+  const wholeGymParticipantCountValid =
+    Number.isFinite(wholeGymParticipantCount) && wholeGymParticipantCount > 0
 
   function handleReceiptUpload(file: File | undefined) {
     if (!file) {
@@ -161,6 +214,11 @@ export function GymDetailPage() {
 
   function handleCourtChange(court: Court) {
     setSelectedCourtId(court.id)
+    setSelectedBookingScope("court")
+  }
+
+  function handleBookingScopeChange(scope: BookingScope) {
+    setSelectedBookingScope(scope)
   }
 
   function getCellState(day: string, time: string): AvailabilityCellState {
@@ -168,7 +226,9 @@ export function GymDetailPage() {
       return "closed"
     }
 
-    if (isSlotBooked(gym!.id, selectedCourt.id, day, time)) {
+    if (
+      isWholeGymBooked(gym!.id, day, time)
+    ) {
       return "booked"
     }
 
@@ -183,7 +243,61 @@ export function GymDetailPage() {
       return "selected"
     }
 
+    if (selectedCourt.bookingMode === "open-play") {
+      const seatsTaken = getOpenPlaySeatsTaken(gym!.id, selectedCourt.id, day, time)
+      const seatsLeft = (selectedCourt.openPlayCapacity ?? 0) - seatsTaken
+      return seatsLeft <= 0 ? "booked" : "available"
+    }
+
+    if (isSlotBooked(gym!.id, selectedCourt.id, day, time)) {
+      return "booked"
+    }
+
     return "available"
+  }
+
+  function getWholeGymCellState(day: string, time: string): AvailabilityCellState {
+    if (!wholeGymSetup || !wholeGymSetup.availableSlots.includes(time)) {
+      return "closed"
+    }
+
+    if (
+      wholeGymSelections.some(
+        (selection) =>
+          selection.date === day && selection.slots.includes(time)
+      )
+    ) {
+      return "selected"
+    }
+
+    if (isGymFullyBooked(gym!.id, day, time)) {
+      return "booked"
+    }
+
+    return "available"
+  }
+
+  function getCellLabel(day: string, time: string, state: AvailabilityCellState) {
+    if (!selectedCourt || selectedCourt.bookingMode !== "open-play") {
+      return undefined
+    }
+
+    const openPlayCapacity = selectedCourt.openPlayCapacity ?? 0
+    const seatsTaken = getOpenPlaySeatsTaken(gym!.id, selectedCourt.id, day, time)
+
+    if (state === "closed") {
+      return "—"
+    }
+
+    if (state === "selected") {
+      return `${Math.min(openPlayCapacity, seatsTaken + 1)}/${openPlayCapacity}`
+    }
+
+    if (state === "booked") {
+      return `${openPlayCapacity}/${openPlayCapacity}`
+    }
+
+    return `${seatsTaken}/${openPlayCapacity}`
   }
 
   function handleCellSelect(day: string, time: string) {
@@ -218,8 +332,34 @@ export function GymDetailPage() {
     })
   }
 
+  function handleWholeGymCellSelect(day: string, time: string) {
+    if (!wholeGymSetup) {
+      return
+    }
+
+    setWholeGymSelections((current) => {
+      const existing = current.find((selection) => selection.date === day)
+
+      if (!existing) {
+        return [...current, { date: day, slots: [time] }]
+      }
+
+      const nextSlots = existing.slots.includes(time)
+        ? existing.slots.filter((slot) => slot !== time)
+        : [...existing.slots, time]
+
+      if (nextSlots.length === 0) {
+        return current.filter((selection) => selection !== existing)
+      }
+
+      return current.map((selection) =>
+        selection === existing ? { ...selection, slots: nextSlots } : selection
+      )
+    })
+  }
+
   function handleConfirmBooking() {
-    if (!gym || bookingSummary.length === 0 || !receiptIsComplete) {
+    if (!gym || !paymentSetup || !receiptIsComplete) {
       return
     }
 
@@ -231,49 +371,122 @@ export function GymDetailPage() {
       uploadedAt: new Date().toISOString(),
     }
 
-    bookingSummary.forEach((selection) => {
-      const createdBooking = addBooking({
-        gymId: gym.id,
-        gym: gym.name,
-        address: gym.address,
-        courtId: selection.court.id,
-        court: selection.court.name,
-        date: selection.date,
-        slots: selection.slots,
-        status: "pending",
-        paymentReceipt,
-      })
+    if (isWholeGymScope) {
+      if (
+        !wholeGymSetup ||
+        wholeGymSelections.length === 0 ||
+        !wholeGymParticipantCountValid
+      ) {
+        return
+      }
 
-      addTransaction({
-        id: createdBooking.id,
-        customerName: user?.name ?? "Guest Player",
-        customerEmail: user?.email ?? "guest@example.com",
-        gymId: gym.id,
-        gym: gym.name,
-        courtId: selection.court.id,
-        court: selection.court.name,
-        date: selection.date,
-        slots: selection.slots,
-        amount: selection.court.pricePerHour * selection.slots.length,
-        paymentMethod: "GCash manual receipt",
-        paymentStatus: "unpaid",
-        status: "pending",
-        paymentReceipt,
+      wholeGymSelections.forEach((selection) => {
+        const createdBooking = addBooking({
+          gymId: gym.id,
+          gym: gym.name,
+          address: gym.address,
+          courtId: "whole-gym",
+          court: "Whole gym",
+          date: selection.date,
+          slots: selection.slots,
+          status: "pending",
+          bookingType: "whole_gym",
+          participantCount: wholeGymParticipantCount,
+          paymentReceipt,
+          ownerName: user?.name ?? "Guest Player",
+          ownerEmail: user?.email ?? "guest@example.com",
+        })
+
+        addTransaction({
+          id: createdBooking.id,
+          customerName: user?.name ?? "Guest Player",
+          customerEmail: user?.email ?? "guest@example.com",
+          gymId: gym.id,
+          gym: gym.name,
+          courtId: "whole-gym",
+          court: "Whole gym",
+          date: selection.date,
+          slots: selection.slots,
+          bookingType: "whole_gym",
+          participantCount: wholeGymParticipantCount,
+          amount: wholeGymSetup.pricePerHour * selection.slots.length,
+          paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
+          paymentStatus: "unpaid",
+          status: "pending",
+          paymentReceipt,
+        })
       })
-    })
+    } else {
+      if (bookingSummary.length === 0) {
+        return
+      }
+
+      bookingSummary.forEach((selection) => {
+        const createdBooking = addBooking({
+          gymId: gym.id,
+          gym: gym.name,
+          address: gym.address,
+          courtId: selection.court.id,
+          court: selection.court.name,
+          date: selection.date,
+          slots: selection.slots,
+          status: "pending",
+          bookingType:
+            selection.court.bookingMode === "open-play"
+              ? "open_play"
+              : "private",
+          participantCount: 1,
+          paymentReceipt,
+          ownerName: user?.name ?? "Guest Player",
+          ownerEmail: user?.email ?? "guest@example.com",
+        })
+
+        addTransaction({
+          id: createdBooking.id,
+          customerName: user?.name ?? "Guest Player",
+          customerEmail: user?.email ?? "guest@example.com",
+          gymId: gym.id,
+          gym: gym.name,
+          courtId: selection.court.id,
+          court: selection.court.name,
+          date: selection.date,
+          slots: selection.slots,
+          bookingType:
+            selection.court.bookingMode === "open-play" ? "open_play" : "private",
+          participantCount: 1,
+          amount:
+            (selection.court.bookingMode === "open-play"
+              ? getOpenPlayPricePerPlayer(selection.court)
+              : selection.court.pricePerHour) * selection.slots.length,
+          paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
+          paymentStatus: "unpaid",
+          status: "pending",
+          paymentReceipt,
+        })
+      })
+    }
     toast.add({
       title: "Receipt submitted",
-      description: `${totalSelectedSlots} slot${totalSelectedSlots === 1 ? "" : "s"} pending owner verification at ${gym.name}.`,
+      description: `${isWholeGymScope ? totalWholeGymSlots : totalSelectedSlots} slot${(isWholeGymScope ? totalWholeGymSlots : totalSelectedSlots) === 1 ? "" : "s"} pending owner verification at ${gym.name}.`,
       type: "success",
     })
     navigate("/my-bookings")
   }
 
-  const estimatedTotal = bookingSummary.reduce(
+  const courtEstimatedTotal = bookingSummary.reduce(
     (total, selection) =>
-      total + selection.court.pricePerHour * selection.slots.length,
+      total +
+      (selection.court.bookingMode === "open-play"
+        ? getOpenPlayPricePerPlayer(selection.court)
+        : selection.court.pricePerHour) *
+        selection.slots.length,
     0
   )
+  const wholeGymEstimatedTotal =
+    (wholeGymSetup?.pricePerHour ?? 0) * totalWholeGymSlots
+  const estimatedTotal = isWholeGymScope
+    ? wholeGymEstimatedTotal
+    : courtEstimatedTotal
 
   return (
     <main className="min-h-svh bg-muted/30">
@@ -392,6 +605,59 @@ export function GymDetailPage() {
 
               <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
                 <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-primary">
+                        Booking option
+                      </p>
+                      <h2 className="text-xl font-semibold tracking-tight">
+                        Choose your booking type
+                      </h2>
+                    </div>
+                  {wholeGymBookingEnabled ? (
+                    <p className="text-sm text-muted-foreground">
+                      Whole gym rental blocks all courts for the selected slot.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleBookingScopeChange("court")}
+                    className={cn(
+                      "min-w-56 rounded-lg border p-4 text-left transition",
+                      !isWholeGymScope
+                        ? "border-primary bg-primary/5 ring-3 ring-primary/20"
+                        : "bg-card hover:border-primary/50"
+                    )}
+                    >
+                      <div className="font-medium">Court booking</div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Reserve a court through the standard booking flow.
+                      </p>
+                    </button>
+                  {wholeGymBookingEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => handleBookingScopeChange("whole_gym")}
+                      className={cn(
+                        "min-w-56 rounded-lg border p-4 text-left transition",
+                        isWholeGymScope
+                          ? "border-primary bg-primary/5 ring-3 ring-primary/20"
+                          : "bg-card hover:border-primary/50"
+                      )}
+                    >
+                      <div className="font-medium">Book the whole gym</div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Exclusive venue rental for organizations, events, or private groups.
+                      </p>
+                    </button>
+                  ) : null}
+                </div>
+              </section>
+
+              {!isWholeGymScope ? (
+              <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
+                <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
                       1
@@ -436,10 +702,19 @@ export function GymDetailPage() {
                         />
                         <div className="p-3">
                           <div className="flex items-start justify-between gap-3">
-                            <h3 className="leading-tight font-semibold">
-                              {court.name}
-                            </h3>
-                            <CourtStatusBadge status={court.status} />
+                            <div className="grid gap-1">
+                              <h3 className="leading-tight font-semibold">
+                                {court.name}
+                              </h3>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <CourtStatusBadge status={court.status} />
+                                <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                  {court.bookingMode === "open-play"
+                                    ? "Open Play"
+                                    : "Private court"}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {court.surface}
@@ -450,7 +725,10 @@ export function GymDetailPage() {
                                 className="size-3.5"
                                 aria-hidden="true"
                               />
-                              {court.capacity}
+                              {court.bookingMode === "open-play" &&
+                              court.openPlayCapacity
+                                ? `${court.openPlayCapacity} players max`
+                                : court.capacity}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Clock3
@@ -462,10 +740,22 @@ export function GymDetailPage() {
                           </div>
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <p className="text-sm font-semibold">
-                              ${court.pricePerHour}
-                              <span className="font-normal text-muted-foreground">
-                                /hr
-                              </span>
+                              {court.bookingMode === "open-play" &&
+                              court.openPlayCapacity ? (
+                                <>
+                                  ${getOpenPlayPricePerPlayer(court).toFixed(2)}
+                                  <span className="font-normal text-muted-foreground">
+                                    /player
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  ${court.pricePerHour}
+                                  <span className="font-normal text-muted-foreground">
+                                    /hr
+                                  </span>
+                                </>
+                              )}
                             </p>
                             {isSelected ? (
                               <span className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">
@@ -484,6 +774,47 @@ export function GymDetailPage() {
                   })}
                 </div>
               </section>
+              ) : (
+                <section className="grid gap-4 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                        1
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-primary">
+                          Whole gym rental
+                        </p>
+                        <h2 className="text-xl font-semibold tracking-tight">
+                          Exclusive access to {gym.name}
+                        </h2>
+                      </div>
+                    </div>
+                    {wholeGymSetup ? (
+                      <p className="text-sm font-medium text-primary">
+                        ${wholeGymSetup.pricePerHour}/hr
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Building2 className="size-4" aria-hidden="true" />
+                        {gym.courts.length} courts included
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock3 className="size-4" aria-hidden="true" />
+                        {wholeGymSetup?.availableSlots.length ?? 0} rental slots
+                      </span>
+                    </div>
+                    {wholeGymSetup?.notes ? (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {wholeGymSetup.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
+              )}
 
               <section className="grid gap-3 rounded-lg border bg-background p-4 shadow-xs sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -496,17 +827,42 @@ export function GymDetailPage() {
                         Availability
                       </p>
                       <h2 className="text-xl font-semibold tracking-tight">
-                        {selectedCourt?.name ?? "Court"} schedule
+                        {isWholeGymScope
+                          ? "Whole gym schedule"
+                          : selectedCourt?.bookingMode === "open-play"
+                          ? `${selectedCourt?.name ?? "Court"} Open Play seats`
+                          : `${selectedCourt?.name ?? "Court"} schedule`}
                       </h2>
                     </div>
                   </div>
                   <AvailabilityCalendarLegend />
                 </div>
-                {selectedCourt ? (
+                {isWholeGymScope && wholeGymSetup ? (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+                    Whole gym booking on Friday, August 21, 2026 onward is exclusive.
+                    If any court or Open Play session already exists on a slot, that slot is blocked here.
+                  </div>
+                ) : null}
+                {!isWholeGymScope && isOpenPlayCourt && selectedCourt?.openPlayCapacity ? (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+                    Open Play on this court allows up to {selectedCourt.openPlayCapacity} players per session.
+                    Each player pays ${getOpenPlayPricePerPlayer(selectedCourt).toFixed(2)} per slot.
+                    Session tiles show booked players as `current/capacity`, and once you select a slot the count updates to include your seat.
+                  </div>
+                ) : null}
+                {isWholeGymScope && wholeGymSetup ? (
+                  <AvailabilityCalendar
+                    days={week}
+                    times={wholeGymSetup.availableSlots}
+                    getState={getWholeGymCellState}
+                    onSelect={gym.status === "active" ? handleWholeGymCellSelect : undefined}
+                  />
+                ) : selectedCourt ? (
                   <AvailabilityCalendar
                     days={week}
                     times={selectedCourt.availableSlots}
                     getState={getCellState}
+                    getLabel={getCellLabel}
                     onSelect={
                       gym.status === "active" &&
                       selectedCourt.status === "available"
@@ -550,24 +906,93 @@ export function GymDetailPage() {
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-muted-foreground">
-                        Active court
+                        Booking type
                       </span>
                       <span className="font-medium">
-                        {selectedCourt?.name ?? "-"}
+                        {isWholeGymScope
+                          ? "Whole gym"
+                          : selectedCourt?.bookingMode === "open-play"
+                            ? "Open Play"
+                            : "Private court"}
                       </span>
                     </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-muted-foreground">
+                        {isWholeGymScope ? "Coverage" : "Active court"}
+                      </span>
+                      <span className="font-medium">
+                        {isWholeGymScope
+                          ? `All ${gym.courts.length} courts`
+                          : selectedCourt?.name ?? "-"}
+                      </span>
+                    </div>
+                    {selectedCourt?.bookingMode === "open-play" &&
+                    selectedCourt.openPlayCapacity ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          Open Play seat price
+                        </span>
+                        <span className="font-medium">
+                          ${getOpenPlayPricePerPlayer(selectedCourt).toFixed(2)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {isWholeGymScope && wholeGymSetup ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          Whole gym rate
+                        </span>
+                        <span className="font-medium">
+                          ${wholeGymSetup.pricePerHour}/hr
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="rounded-lg bg-muted p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-muted-foreground">
-                        Selected courts and times
+                        {isWholeGymScope
+                          ? "Selected whole gym slots"
+                          : isOpenPlayCourt
+                          ? "Selected Open Play sessions"
+                          : "Selected courts and times"}
                       </span>
                       <span className="text-xs font-medium text-muted-foreground">
-                        {totalSelectedSlots} slot
-                        {totalSelectedSlots === 1 ? "" : "s"}
+                        {isWholeGymScope ? totalWholeGymSlots : totalSelectedSlots}{" "}
+                        slot
+                        {(isWholeGymScope
+                          ? totalWholeGymSlots
+                          : totalSelectedSlots) === 1
+                          ? ""
+                          : "s"}
                       </span>
                     </div>
-                    {bookingSummary.length > 0 ? (
+                    {isWholeGymScope ? (
+                      wholeGymSelections.length > 0 ? (
+                        <div className="mt-2 grid gap-2">
+                          {wholeGymSelections.map((selection) => (
+                            <div
+                              key={`whole-gym-${selection.date}`}
+                              className="rounded-md bg-background p-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">Whole gym</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {selection.date}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {selection.slots.join(", ")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="mt-1 block font-medium">
+                          No whole gym slots selected
+                        </span>
+                      )
+                    ) : bookingSummary.length > 0 ? (
                       <div className="mt-2 grid gap-2">
                         {bookingSummary.map((selection) => (
                           <div
@@ -585,6 +1010,16 @@ export function GymDetailPage() {
                             <p className="mt-1 text-sm text-muted-foreground">
                               {selection.slots.join(", ")}
                             </p>
+                            {selection.court.bookingMode === "open-play" &&
+                            selection.court.openPlayCapacity ? (
+                              <p className="mt-1 text-xs text-primary">
+                                1 seat at $
+                                {getOpenPlayPricePerPlayer(selection.court).toFixed(
+                                  2
+                                )}{" "}
+                                per slot · projected occupancy updates in the calendar
+                              </p>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -594,57 +1029,129 @@ export function GymDetailPage() {
                       </span>
                     )}
                   </div>
-                  <div className="grid gap-3 rounded-lg border p-3">
-                    <div>
-                      <h3 className="text-sm font-medium">GCash receipt</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Required before the reservation is submitted for owner
-                        verification.
+                  {isWholeGymScope ? (
+                    <div className="grid gap-2 rounded-lg border p-3">
+                      <Label htmlFor="whole-gym-participants">
+                        Expected number of players
+                      </Label>
+                      <Input
+                        id="whole-gym-participants"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={wholeGymParticipants}
+                        onChange={(event) =>
+                          setWholeGymParticipants(event.target.value)
+                        }
+                        placeholder="e.g. 20"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This helps the owner understand the scale of the private organization booking.
                       </p>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="gcash-reference">
-                        GCash reference number
-                      </Label>
-                      <Input
-                        id="gcash-reference"
-                        value={gcashReference}
-                        onChange={(event) =>
-                          setGcashReference(event.target.value)
-                        }
-                        placeholder="e.g. 1002 345 678901"
-                      />
+                  ) : null}
+                  <div className="grid gap-3 rounded-lg border p-3">
+                    <div>
+                      <h3 className="text-sm font-medium">Venue payment methods</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Pick the best payment option for you, send the payment,
+                        then upload your receipt for owner confirmation.
+                      </p>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="gcash-account-name">
-                        Sender account name
-                      </Label>
-                      <Input
-                        id="gcash-account-name"
-                        value={gcashAccountName}
-                        onChange={(event) =>
-                          setGcashAccountName(event.target.value)
-                        }
-                        placeholder="Name shown on the receipt"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="gcash-receipt">Receipt image</Label>
-                      <Input
-                        id="gcash-receipt"
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) =>
-                          handleReceiptUpload(event.target.files?.[0])
-                        }
-                      />
-                      {receiptFileName ? (
-                        <div className="flex items-center gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
-                          <ImageUp className="size-4" aria-hidden="true" />
-                          <span className="truncate">{receiptFileName}</span>
+                    {paymentSetup ? (
+                      <>
+                        <div className="grid gap-2">
+                          <Label htmlFor="payment-method">Select payment method</Label>
+                          <select
+                            id="payment-method"
+                            value={String(selectedPaymentOptionIndex)}
+                            onChange={(event) =>
+                              setSelectedPaymentOptionIndex(Number(event.target.value))
+                            }
+                            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                          >
+                            {paymentOptions.map((option, index) => (
+                              <option key={`${option.provider}-${option.accountNumber}-${index}`} value={index}>
+                                {option.provider} - {option.accountNumber}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      ) : null}
-                    </div>
+                        <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
+                          <div className="grid gap-1">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                              <QrCode className="size-3.5" aria-hidden="true" />
+                              {paymentSetup.provider}
+                            </span>
+                            <span className="font-medium">
+                              {paymentSetup.accountName}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {paymentSetup.accountNumber}
+                            </span>
+                          </div>
+                          <img
+                            src={paymentSetup.qrCodeImageUrl}
+                            alt={`${paymentSetup.provider} QR code for ${gym.name}`}
+                            className="mx-auto aspect-square w-full max-w-56 rounded-lg border bg-white object-contain p-3"
+                          />
+                          {paymentSetup.instructions ? (
+                            <p className="text-xs text-muted-foreground">
+                              {paymentSetup.instructions}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label htmlFor="payment-reference">
+                            Payment reference number
+                          </Label>
+                          <Input
+                            id="payment-reference"
+                            value={gcashReference}
+                            onChange={(event) =>
+                              setGcashReference(event.target.value)
+                            }
+                            placeholder="e.g. 1002 345 678901"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="payment-account-name">
+                            Sender account name
+                          </Label>
+                          <Input
+                            id="payment-account-name"
+                            value={gcashAccountName}
+                            onChange={(event) =>
+                              setGcashAccountName(event.target.value)
+                            }
+                            placeholder="Name shown on the receipt"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="payment-receipt">Receipt screenshot</Label>
+                          <Input
+                            id="payment-receipt"
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) =>
+                              handleReceiptUpload(event.target.files?.[0])
+                            }
+                          />
+                          {receiptFileName ? (
+                            <div className="flex items-center gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
+                              <ImageUp className="size-4" aria-hidden="true" />
+                              <span className="truncate">{receiptFileName}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+                        This venue has not configured any payment methods yet. Booking
+                        submission is disabled until the owner sets one up.
+                      </div>
+                    )}
                   </div>
                   <div className="grid gap-2 rounded-lg bg-primary/10 p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -657,23 +1164,31 @@ export function GymDetailPage() {
                       </span>
                     </div>
                     <p className="text-xs text-primary/80">
-                      {totalSelectedSlots} slot
-                      {totalSelectedSlots === 1 ? "" : "s"} across{" "}
-                      {bookingSummary.length} court/date
-                      {bookingSummary.length === 1 ? "" : "s"}
+                      {isWholeGymScope
+                        ? `${totalWholeGymSlots} whole gym slot${totalWholeGymSlots === 1 ? "" : "s"} for ${wholeGymParticipantCountValid ? wholeGymParticipantCount : 0} player${wholeGymParticipantCount === 1 ? "" : "s"}`
+                        : isOpenPlayCourt
+                        ? `${totalSelectedSlots} Open Play seat${totalSelectedSlots === 1 ? "" : "s"} selected`
+                        : `${totalSelectedSlots} slot${totalSelectedSlots === 1 ? "" : "s"} across ${bookingSummary.length} court/date${bookingSummary.length === 1 ? "" : "s"}`}
                     </p>
                   </div>
                   <Button
                     className="w-full"
                     onClick={handleConfirmBooking}
                     disabled={
-                      totalSelectedSlots === 0 ||
+                      (isWholeGymScope
+                        ? totalWholeGymSlots === 0 || !wholeGymParticipantCountValid
+                        : totalSelectedSlots === 0) ||
                       gym.status !== "active" ||
+                      !paymentSetup ||
                       !receiptIsComplete
                     }
                   >
                     <CalendarCheck className="size-4" aria-hidden="true" />
-                    Submit receipt and book
+                    {isWholeGymScope
+                      ? "Submit whole gym request"
+                      : isOpenPlayCourt
+                        ? "Join Open Play"
+                        : "Submit payment proof"}
                   </Button>
                 </CardContent>
               </Card>

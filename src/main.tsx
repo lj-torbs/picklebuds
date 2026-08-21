@@ -5,7 +5,7 @@ import { BrowserRouter } from "react-router-dom"
 import "./index.css"
 import App from "./App.tsx"
 import { AdminAuthProvider } from "@/admin/lib/admin-auth-context"
-import { AdminUsersProvider } from "@/admin/lib/admin-users-context"
+import { AdminOwnersProvider } from "@/admin/lib/admin-owners-context"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { ToastProvider } from "@/components/ui/toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -23,7 +23,7 @@ createRoot(document.getElementById("root")!).render(
           <TransactionsProvider>
             <GymsProvider>
               <AdminAuthProvider>
-                <AdminUsersProvider>
+                <AdminOwnersProvider>
                   <OwnerAuthProvider>
                     <ThemeProvider>
                       <ToastProvider>
@@ -32,7 +32,7 @@ createRoot(document.getElementById("root")!).render(
                       </ToastProvider>
                     </ThemeProvider>
                   </OwnerAuthProvider>
-                </AdminUsersProvider>
+                </AdminOwnersProvider>
               </AdminAuthProvider>
             </GymsProvider>
           </TransactionsProvider>

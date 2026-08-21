@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import {
   ArrowRight,
   Bell,
+  Building2,
   CalendarCheck,
   Clock3,
   MapPin,
@@ -15,11 +16,15 @@ import { buttonVariants } from "@/components/ui/button-variants"
 import { Input } from "@/components/ui/input"
 import { GymPhoto } from "@/shared/components/gyms/gym-photo"
 import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
+import { OpenPlayPanel } from "@/shared/components/player/open-play-panel"
+import { PasaloPanel } from "@/shared/components/player/pasalo-panel"
+import { PlayerModeStrip } from "@/shared/components/player/player-mode-strip"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 
 type AvailabilityFilter = "all" | "active" | "open-now"
 type PriceFilter = "all" | "budget" | "standard" | "premium"
+type BookingWorkspaceMode = "booking" | "open-play" | "pasalo"
 
 const gymMeta: Record<string, { distance: string; rating: string }> = {
   northside: { distance: "0.8 km", rating: "4.9" },
@@ -127,11 +132,22 @@ function gymMatchesPrice(gym: Gym, filter: PriceFilter) {
 
 export function BookingPage() {
   const { gyms } = useGyms()
+  const [searchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [locationFilter, setLocationFilter] = useState("all")
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all")
   const [availabilityFilter, setAvailabilityFilter] =
     useState<AvailabilityFilter>("all")
+
+  const mode = (() => {
+    const value = searchParams.get("mode")
+
+    if (value === "open-play" || value === "pasalo") {
+      return value
+    }
+
+    return "booking"
+  })() as BookingWorkspaceMode
 
   const locations = useMemo(
     () => Array.from(new Set(gyms.map((gym) => getGymLocation(gym)))).sort(),
@@ -199,161 +215,231 @@ export function BookingPage() {
       </header>
 
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Find a court
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {gyms.length} venues in Tagum City · {activeVenueCount} accepting
-            bookings · {totalOpenSlots} open slots today
-          </p>
-        </div>
+        <PlayerModeStrip current={mode} />
 
-        <div className="mt-4 grid gap-3 rounded-lg border bg-background p-3 shadow-xs sm:grid-cols-[minmax(220px,1.4fr)_repeat(3,minmax(140px,1fr))]">
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              className="h-10 pl-10"
-              placeholder="Search gym, barangay, court"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
+        {mode === "open-play" ? (
+          <div className="mt-6">
+            <OpenPlayPanel />
           </div>
-          <select
-            value={locationFilter}
-            onChange={(event) => setLocationFilter(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            aria-label="Filter by location"
-          >
-            <option value="all">All areas</option>
-            {locations.map((location) => (
-              <option key={location} value={location}>
-                {location}
-              </option>
-            ))}
-          </select>
-          <select
-            value={priceFilter}
-            onChange={(event) =>
-              setPriceFilter(event.target.value as PriceFilter)
-            }
-            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            aria-label="Filter by price"
-          >
-            <option value="all">Any price</option>
-            <option value="budget">$12/hr and below</option>
-            <option value="standard">$13-$15/hr</option>
-            <option value="premium">$16/hr and up</option>
-          </select>
-          <select
-            value={availabilityFilter}
-            onChange={(event) =>
-              setAvailabilityFilter(event.target.value as AvailabilityFilter)
-            }
-            className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            aria-label="Filter by availability"
-          >
-            <option value="all">Any availability</option>
-            <option value="active">Active venues</option>
-            <option value="open-now">Has open slots</option>
-          </select>
-        </div>
-
-        <div className="mt-5 flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            {filteredGyms.length} matching result
-            {filteredGyms.length === 1 ? "" : "s"}
-          </p>
-          <span className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            {locationFilter === "all" ? "Tagum City" : locationFilter}
-          </span>
-        </div>
-
-        {filteredGyms.length === 0 ? (
-          <div className="mt-4 rounded-lg border bg-background p-8 text-center shadow-xs">
-            <p className="font-medium">No venues match your filters</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Change the location, price, availability, or search term.
-            </p>
+        ) : mode === "pasalo" ? (
+          <div className="mt-6">
+            <PasaloPanel />
           </div>
         ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredGyms.map((gym) => {
-              const meta = getGymMeta(gym)
-              const openCourts = getOpenCourts(gym)
+          <>
+            <div className="mt-6">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                Find a court
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {gyms.length} venues in Tagum City · {activeVenueCount} accepting
+                bookings · {totalOpenSlots} open slots today
+              </p>
+            </div>
 
-              return (
-                <Link
-                  key={gym.id}
-                  to={`/booking/${gym.id}`}
-                  className="group flex flex-col overflow-hidden rounded-lg border bg-background shadow-xs transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
-                >
-                  <div className="relative aspect-4/3">
-                    <GymPhoto
-                      src={gym.imageUrl}
-                      alt={gym.name}
-                      className="absolute inset-0 size-full"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
-                    <div className="absolute top-3 left-3">
-                      <GymStatusBadge status={gym.status} />
-                    </div>
-                    <div className="absolute right-3 bottom-3 left-3 flex items-center justify-between gap-2">
-                      <span className="rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground">
-                        {meta.distance}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground">
-                        <Star
-                          className="size-3 fill-primary text-primary"
-                          aria-hidden="true"
+            <div className="mt-4 grid gap-3 rounded-lg border bg-background p-3 shadow-xs sm:grid-cols-[minmax(220px,1.4fr)_repeat(3,minmax(140px,1fr))]">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  className="h-10 pl-10"
+                  placeholder="Search gym, barangay, court"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
+              </div>
+              <select
+                value={locationFilter}
+                onChange={(event) => setLocationFilter(event.target.value)}
+                className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                aria-label="Filter by location"
+              >
+                <option value="all">All areas</option>
+                {locations.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={priceFilter}
+                onChange={(event) =>
+                  setPriceFilter(event.target.value as PriceFilter)
+                }
+                className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                aria-label="Filter by price"
+              >
+                <option value="all">Any price</option>
+                <option value="budget">$12/hr and below</option>
+                <option value="standard">$13-$15/hr</option>
+                <option value="premium">$16/hr and up</option>
+              </select>
+              <select
+                value={availabilityFilter}
+                onChange={(event) =>
+                  setAvailabilityFilter(event.target.value as AvailabilityFilter)
+                }
+                className="h-10 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                aria-label="Filter by availability"
+              >
+                <option value="all">Any availability</option>
+                <option value="active">Active venues</option>
+                <option value="open-now">Has open slots</option>
+              </select>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                {filteredGyms.length} matching result
+                {filteredGyms.length === 1 ? "" : "s"}
+              </p>
+              <span className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                {locationFilter === "all" ? "Tagum City" : locationFilter}
+              </span>
+            </div>
+
+            {filteredGyms.length === 0 ? (
+              <div className="mt-4 rounded-lg border bg-background p-8 text-center shadow-xs">
+                <p className="font-medium">No venues match your filters</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Change the location, price, availability, or search term.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredGyms.map((gym) => {
+                  const meta = getGymMeta(gym)
+                  const openCourts = getOpenCourts(gym)
+
+                  return (
+                    <div
+                      key={gym.id}
+                      className="group flex flex-col overflow-hidden rounded-lg border bg-background shadow-xs transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
+                    >
+                      <div className="relative aspect-4/3">
+                        <GymPhoto
+                          src={gym.imageUrl}
+                          alt={gym.name}
+                          className="absolute inset-0 size-full"
                         />
-                        {meta.rating}
-                      </span>
-                    </div>
-                  </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
+                        <div className="absolute left-3 top-3">
+                          <GymStatusBadge status={gym.status} />
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                          <span className="rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground">
+                            {meta.distance}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-md bg-background/95 px-2 py-1 text-xs font-medium text-foreground">
+                            <Star
+                              className="size-3 fill-primary text-primary"
+                              aria-hidden="true"
+                            />
+                            {meta.rating}
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="flex flex-1 flex-col gap-3 p-4">
-                    <div>
-                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{getGymLocation(gym)}</span>
-                      </p>
-                      <h3 className="mt-1 text-lg font-semibold tracking-tight">
-                        {gym.name}
-                      </h3>
-                    </div>
+                      <div className="flex flex-1 flex-col gap-3 p-4">
+                        <div>
+                          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{getGymLocation(gym)}</span>
+                          </p>
+                          <h3 className="mt-1 text-lg font-semibold tracking-tight">
+                            {gym.name}
+                          </h3>
+                        </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {openCourts.length}/{gym.courts.length} court
-                        {gym.courts.length === 1 ? "" : "s"} open
-                      </span>
-                      <span className="font-semibold">
-                        {getPriceRange(gym.courts)}
-                      </span>
-                    </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {openCourts.length}/{gym.courts.length} court
+                            {gym.courts.length === 1 ? "" : "s"} open
+                          </span>
+                          <span className="font-semibold">
+                            {getPriceRange(gym.courts)}
+                          </span>
+                        </div>
 
-                    <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3 text-sm">
-                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                        <Clock3 className="size-3.5" aria-hidden="true" />
-                        Next: {getNextSlot(gym)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 font-medium text-primary">
-                        View
-                        <ArrowRight
-                          className="size-3.5 transition group-hover:translate-x-0.5"
-                          aria-hidden="true"
-                        />
-                      </span>
+                        {gym.wholeGymBooking?.enabled ? (
+                          <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1.5 font-medium text-primary">
+                                <Building2 className="size-4" aria-hidden="true" />
+                                Whole gym available
+                              </span>
+                              <span className="font-semibold text-primary">
+                                ${gym.wholeGymBooking.pricePerHour}/hr
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-primary/80">
+                              Exclusive venue rental for private groups and
+                              organizations.
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <div className="mt-auto grid gap-2 border-t pt-3 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                              <Clock3 className="size-3.5" aria-hidden="true" />
+                              Next: {getNextSlot(gym)}
+                            </span>
+                            <Link
+                              to={`/booking/${gym.id}`}
+                              className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                            >
+                              Venue details
+                              <ArrowRight
+                                className="size-3.5 transition group-hover:translate-x-0.5"
+                                aria-hidden="true"
+                              />
+                            </Link>
+                          </div>
+                          {gym.wholeGymBooking?.enabled ? (
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="text-muted-foreground">
+                                Whole gym booking available in this venue
+                              </span>
+                              <span className="font-medium text-primary">
+                                Booking option
+                              </span>
+                            </div>
+                          ) : null}
+                          <div className="grid gap-2 pt-1 sm:grid-cols-2">
+                            <Link
+                              to={`/booking/${gym.id}`}
+                              className={buttonVariants({
+                                size: "sm",
+                                className: "w-full",
+                              })}
+                            >
+                              Book courts
+                            </Link>
+                            {gym.wholeGymBooking?.enabled ? (
+                              <Link
+                                to={`/booking/${gym.id}?scope=whole-gym`}
+                                className={buttonVariants({
+                                  variant: "outline",
+                                  size: "sm",
+                                  className:
+                                    "w-full border-primary/30 text-primary hover:bg-primary/5 hover:text-primary",
+                                })}
+                              >
+                                Book whole gym
+                              </Link>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>

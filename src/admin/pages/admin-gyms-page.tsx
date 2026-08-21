@@ -44,7 +44,10 @@ export function AdminGymsPage() {
     name: string
     address: string
     phone: string
+    imageUrl?: string
     status: GymStatus
+    paymentOptions: Gym["paymentOptions"]
+    wholeGymBooking?: Gym["wholeGymBooking"]
   }) {
     if (editingGym) {
       updateGym(editingGym.id, values)
@@ -54,7 +57,7 @@ export function AdminGymsPage() {
         type: "success",
       })
     } else {
-      addGym(values)
+      addGym({ ...values, ownerId: "owner-1" })
       toast.add({
         title: "Gym added",
         description: `${values.name} is now live on the platform.`,
@@ -83,7 +86,10 @@ export function AdminGymsPage() {
     surface: string
     capacity: string
     pricePerHour: number
+    imageUrl?: string
     status: CourtStatus
+    bookingMode: Court["bookingMode"]
+    openPlayCapacity?: number
     availableSlots: string[]
   }) {
     if (!activeGymId) {

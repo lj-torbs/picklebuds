@@ -26,7 +26,7 @@ export function TransactionTable({
     <div className="overflow-x-auto rounded-lg border bg-card">
       <table className="w-full min-w-max text-left text-sm">
         <thead>
-          <tr className="border-b bg-muted/50 text-xs text-muted-foreground uppercase">
+          <tr className="border-b bg-muted/30 text-[11px] uppercase text-muted-foreground">
             <th className="px-4 py-3 font-medium">Transaction</th>
             <th className="px-4 py-3 font-medium">Customer</th>
             <th className="px-4 py-3 font-medium">Gym / court</th>
@@ -41,31 +41,48 @@ export function TransactionTable({
         </thead>
         <tbody className="divide-y">
           {transactions.map((transaction) => (
-            <tr key={transaction.id} className="hover:bg-muted/30">
-              <td className="px-4 py-3 font-medium">{transaction.id}</td>
-              <td className="px-4 py-3">
-                <div>{transaction.customerName}</div>
+            <tr key={transaction.id} className="hover:bg-muted/10">
+              <td className="px-4 py-2.5">
+                <div className="grid gap-1">
+                  <span className="font-medium">{transaction.id}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {transaction.referenceNumber}
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="font-medium">{transaction.customerName}</div>
                 <div className="text-xs text-muted-foreground">
                   {transaction.customerEmail}
                 </div>
               </td>
-              <td className="px-4 py-3">
-                <div>{transaction.gym}</div>
+              <td className="px-4 py-2.5">
+                <div className="font-medium">{transaction.gym}</div>
                 <div className="text-xs text-muted-foreground">
                   {transaction.court}
                 </div>
               </td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                {transaction.date}
+              <td className="px-4 py-2.5 whitespace-nowrap">
+                <div className="grid gap-1">
+                  <span>{transaction.date}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {transaction.time}
+                  </span>
+                </div>
               </td>
-              <td className="px-4 py-3 font-medium">${transaction.amount}</td>
-              <td className="px-4 py-3">
-                <PaymentStatusBadge status={transaction.paymentStatus} />
+              <td className="px-4 py-2.5 font-medium">${transaction.amount}</td>
+              <td className="px-4 py-2.5">
+                <div className="grid gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {transaction.paymentMethod}
+                  </span>
+                  <PaymentStatusBadge status={transaction.paymentStatus} />
+                </div>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-2.5">
                 <TransactionStatusBadge status={transaction.status} />
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-2.5 text-right">
                 <Button
                   type="button"
                   variant="ghost"

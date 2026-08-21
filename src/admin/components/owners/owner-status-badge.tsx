@@ -1,12 +1,12 @@
-import type { PlayerStatus } from "@/admin/lib/admin-users-context"
+import type { OwnerStatus } from "@/admin/lib/admin-owners-context"
 import { cn } from "@/lib/utils"
 
-const statusStyles: Record<PlayerStatus, string> = {
+const statusStyles: Record<OwnerStatus, string> = {
   active: "bg-primary/15 text-primary",
   suspended: "bg-destructive/10 text-destructive",
 }
 
-export function UserStatusBadge({ status }: { status: PlayerStatus }) {
+export function OwnerStatusBadge({ status }: { status: OwnerStatus }) {
   return (
     <span
       className={cn(

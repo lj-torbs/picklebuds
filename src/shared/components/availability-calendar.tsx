@@ -31,12 +31,18 @@ export function AvailabilityCalendar({
   days,
   times,
   getState,
+  getLabel,
   onSelect,
   className,
 }: {
   days: AvailabilityCalendarDay[]
   times: string[]
   getState: (day: string, time: string) => AvailabilityCellState
+  getLabel?: (
+    day: string,
+    time: string,
+    state: AvailabilityCellState
+  ) => string | undefined
   onSelect?: (day: string, time: string) => void
   className?: string
 }) {
@@ -95,7 +101,7 @@ export function AvailabilityCalendar({
                         stateStyles[state]
                       )}
                     >
-                      {stateLabel[state]}
+                      {getLabel?.(day.value, time, state) ?? stateLabel[state]}
                     </button>
                   </td>
                 )

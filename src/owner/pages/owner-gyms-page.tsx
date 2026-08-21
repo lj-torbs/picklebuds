@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Plus } from "lucide-react"
 
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { CourtFormSheet } from "@/shared/components/gyms/court-form-sheet"
@@ -6,6 +7,7 @@ import { GymCard } from "@/shared/components/gyms/gym-card"
 import { GymFormSheet } from "@/shared/components/gyms/gym-form-sheet"
 import type { Court, CourtStatus, Gym, GymStatus } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
+import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 
 export function OwnerGymsPage() {
@@ -26,21 +28,39 @@ export function OwnerGymsPage() {
   const [activeGymId, setActiveGymId] = useState<string | null>(null)
   const [editingCourt, setEditingCourt] = useState<Court | null>(null)
 
+  function openAddGym() {
+    setEditingGym(null)
+    setGymFormOpen(true)
+  }
+
   function handleSaveGym(values: {
     name: string
     address: string
     phone: string
+    imageUrl?: string
     status: GymStatus
+    paymentOptions: Gym["paymentOptions"]
+    wholeGymBooking?: Gym["wholeGymBooking"]
   }) {
-    if (!editingGym) {
+    if (!owner?.id) {
       return
     }
-    updateGym(editingGym.id, values)
-    toast.add({
-      title: "Gym updated",
-      description: `${values.name} has been updated.`,
-      type: "success",
-    })
+
+    if (editingGym) {
+      updateGym(editingGym.id, values)
+      toast.add({
+        title: "Gym updated",
+        description: `${values.name} has been updated.`,
+        type: "success",
+      })
+    } else {
+      addGym({ ...values, ownerId: owner.id })
+      toast.add({
+        title: "Gym added",
+        description: `${values.name} is now part of your venues.`,
+        type: "success",
+      })
+    }
   }
 
   function openAddCourt(gymId: string) {
@@ -54,7 +74,10 @@ export function OwnerGymsPage() {
     surface: string
     capacity: string
     pricePerHour: number
+    imageUrl?: string
     status: CourtStatus
+    bookingMode: Court["bookingMode"]
+    openPlayCapacity?: number
     availableSlots: string[]
   }) {
     if (!activeGymId) {
@@ -89,19 +112,37 @@ export function OwnerGymsPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-medium text-primary">Venues</p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight">My gyms</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Manage your courts, pricing, and availability. Need a new venue
-          added to your account? Contact platform support.
-        </p>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-medium text-primary">Venues</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">My gyms</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Manage your courts, pricing, payment methods, and booking
+            availability across every venue you operate.
+          </p>
+        </div>
+        <Button type="button" onClick={openAddGym}>
+          <Plus className="size-4" aria-hidden="true" />
+          Add gym
+        </Button>
       </div>
 
       {ownedGyms.length === 0 ? (
-        <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
-          No venues are linked to your account yet.
-        </p>
+        <div className="grid gap-4 rounded-lg border bg-card p-6 text-center">
+          <div className="grid gap-1">
+            <p className="text-sm font-medium">No venues are linked yet</p>
+            <p className="text-sm text-muted-foreground">
+              Add your first gym to start setting up courts, booking slots, and
+              payment collection.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <Button type="button" onClick={openAddGym}>
+              <Plus className="size-4" aria-hidden="true" />
+              Add gym
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="grid gap-4">
           {ownedGyms.map((gym) => (

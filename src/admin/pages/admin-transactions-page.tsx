@@ -1,8 +1,21 @@
+import { useBookings } from "@/lib/bookings-context"
 import { TransactionsManager } from "@/shared/components/transactions/transactions-manager"
+import type { TransactionStatus } from "@/shared/lib/transactions-context"
 import { useTransactions } from "@/shared/lib/transactions-context"
 
 export function AdminTransactionsPage() {
   const { transactions, setStatus, refund } = useTransactions()
+  const { setBookingStatus } = useBookings()
+
+  function handleSetStatus(id: string, status: TransactionStatus) {
+    setStatus(id, status)
+    setBookingStatus(id, status)
+  }
+
+  function handleRefund(id: string) {
+    refund(id)
+    setBookingStatus(id, "cancelled")
+  }
 
   return (
     <div className="grid gap-6">
@@ -19,8 +32,8 @@ export function AdminTransactionsPage() {
 
       <TransactionsManager
         transactions={transactions}
-        onSetStatus={setStatus}
-        onRefund={refund}
+        onSetStatus={handleSetStatus}
+        onRefund={handleRefund}
       />
     </div>
   )

@@ -9,10 +9,11 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
-type DatePickerProps = {
+type DateRangePickerProps = {
   id?: string
-  value: string
-  onChange: (value: string) => void
+  from: string
+  to: string
+  onChange: (range: { from: string; to: string }) => void
   placeholder?: string
 }
 
@@ -65,16 +66,25 @@ function isSameDay(first: Date, second: Date) {
   )
 }
 
-export function DatePicker({
+function isWithinRange(day: Date, from: Date, to: Date) {
+  const time = day.setHours(0, 0, 0, 0)
+  return time >= from.setHours(0, 0, 0, 0) && time <= to.setHours(0, 0, 0, 0)
+}
+
+export function DateRangePicker({
   id,
-  value,
+  from,
+  to,
   onChange,
-  placeholder = "Select date",
-}: DatePickerProps) {
-  const hasValue = value.trim().length > 0
-  const selectedDate = hasValue ? parseDateValue(value) : new Date()
+  placeholder = "Select date range",
+}: DateRangePickerProps) {
+  const hasFrom = from.trim().length > 0
+  const hasTo = to.trim().length > 0
+  const fromDate = hasFrom ? parseDateValue(from) : null
+  const toDate = hasTo ? parseDateValue(to) : null
+  const initialMonth = fromDate ?? new Date()
   const [monthDate, setMonthDate] = useState(
-    () => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+    () => new Date(initialMonth.getFullYear(), initialMonth.getMonth(), 1)
   )
   const monthDays = useMemo(() => getMonthDays(monthDate), [monthDate])
 
@@ -84,9 +94,33 @@ export function DatePicker({
     )
   }
 
-  function selectDay(day: number) {
-    onChange(toDateValue(new Date(monthDate.getFullYear(), monthDate.getMonth(), day)))
+  function handleSelect(day: number) {
+    const selectedDate = new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth(),
+      day
+    )
+    const selectedValue = toDateValue(selectedDate)
+
+    if (!hasFrom || (hasFrom && hasTo)) {
+      onChange({ from: selectedValue, to: "" })
+      return
+    }
+
+    if (fromDate && selectedDate < fromDate) {
+      onChange({ from: selectedValue, to: from })
+      return
+    }
+
+    onChange({ from, to: selectedValue })
   }
+
+  const triggerLabel =
+    hasFrom && hasTo
+      ? `${selectedDateFormatter.format(fromDate!)} - ${selectedDateFormatter.format(toDate!)}`
+      : hasFrom
+        ? `${selectedDateFormatter.format(fromDate!)} - End date`
+        : placeholder
 
   return (
     <Popover>
@@ -101,11 +135,7 @@ export function DatePicker({
         }
       >
         <CalendarDays className="size-4 text-muted-foreground" aria-hidden="true" />
-        {hasValue ? (
-          selectedDateFormatter.format(selectedDate)
-        ) : (
-          <span className="text-muted-foreground">{placeholder}</span>
-        )}
+        <span className={cn(!hasFrom && "text-muted-foreground")}>{triggerLabel}</span>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3">
         <div className="flex items-center justify-between gap-2">
@@ -130,6 +160,11 @@ export function DatePicker({
           </Button>
         </div>
 
+        <div className="mt-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <span>{hasFrom ? selectedDateFormatter.format(fromDate!) : "Start date"}</span>
+          <span>{hasTo ? selectedDateFormatter.format(toDate!) : "End date"}</span>
+        </div>
+
         <div className="mt-3 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
           {dayLabels.map((day) => (
             <span key={day} className="py-1">
@@ -143,23 +178,46 @@ export function DatePicker({
             day === null ? (
               <span key={`blank-${index}`} className="size-9" />
             ) : (
-              <button
-                key={day}
-                type="button"
-                onClick={() => selectDay(day)}
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-md text-sm transition hover:bg-muted",
-                  hasValue &&
-                    isSameDay(
-                    selectedDate,
-                    new Date(monthDate.getFullYear(), monthDate.getMonth(), day)
-                  ) && "bg-primary text-primary-foreground hover:bg-primary"
-                )}
-              >
-                {day}
-              </button>
+              (() => {
+                const date = new Date(
+                  monthDate.getFullYear(),
+                  monthDate.getMonth(),
+                  day
+                )
+                const isBoundary =
+                  (fromDate && isSameDay(fromDate, date)) ||
+                  (toDate && isSameDay(toDate, date))
+                const inRange =
+                  fromDate && toDate ? isWithinRange(date, fromDate, toDate) : false
+
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => handleSelect(day)}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-md text-sm transition hover:bg-muted",
+                      inRange && "bg-primary/10 text-primary",
+                      isBoundary && "bg-primary text-primary-foreground hover:bg-primary"
+                    )}
+                  >
+                    {day}
+                  </button>
+                )
+              })()
             )
           )}
+        </div>
+
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => onChange({ from: "", to: "" })}
+          >
+            Clear
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

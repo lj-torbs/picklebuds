@@ -1,14 +1,17 @@
 import { useMemo } from "react"
 
+import { useBookings } from "@/lib/bookings-context"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { TransactionsManager } from "@/shared/components/transactions/transactions-manager"
 import { useGyms } from "@/shared/lib/gyms-context"
+import type { TransactionStatus } from "@/shared/lib/transactions-context"
 import { useTransactions } from "@/shared/lib/transactions-context"
 
 export function OwnerTransactionsPage() {
   const { owner } = useOwnerAuth()
   const { gyms } = useGyms()
   const { transactions, setStatus, refund } = useTransactions()
+  const { setBookingStatus } = useBookings()
 
   const ownedGymIds = useMemo(
     () => new Set(gyms.filter((gym) => gym.ownerId === owner?.id).map((gym) => gym.id)),
@@ -19,6 +22,16 @@ export function OwnerTransactionsPage() {
     () => transactions.filter((transaction) => ownedGymIds.has(transaction.gymId)),
     [transactions, ownedGymIds]
   )
+
+  function handleSetStatus(id: string, status: TransactionStatus) {
+    setStatus(id, status)
+    setBookingStatus(id, status)
+  }
+
+  function handleRefund(id: string) {
+    refund(id)
+    setBookingStatus(id, "cancelled")
+  }
 
   return (
     <div className="grid gap-6">
@@ -35,8 +48,9 @@ export function OwnerTransactionsPage() {
 
       <TransactionsManager
         transactions={ownedTransactions}
-        onSetStatus={setStatus}
-        onRefund={refund}
+        enableReporting
+        onSetStatus={handleSetStatus}
+        onRefund={handleRefund}
       />
     </div>
   )

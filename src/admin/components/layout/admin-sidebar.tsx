@@ -13,7 +13,7 @@ const navItems = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/transactions", label: "Transactions", icon: Receipt },
   { to: "/admin/gyms", label: "Gyms & Courts", icon: Building2 },
-  { to: "/admin/users", label: "Users", icon: UsersRound },
+  { to: "/admin/owners", label: "Owners", icon: UsersRound },
 ]
 
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {

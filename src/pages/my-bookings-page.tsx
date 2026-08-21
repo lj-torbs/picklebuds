@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import {
   Bell,
+  BadgeDollarSign,
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
@@ -23,8 +24,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { DatePicker } from "@/components/ui/date-picker"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
-import type { Booking, BookingStatus } from "@/lib/bookings-context"
+import type {
+  Booking,
+  BookingStatus,
+  PasaloStatus,
+} from "@/lib/bookings-context"
 import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
 
@@ -44,11 +51,21 @@ const statusStyles: Record<BookingStatus, string> = {
   cancelled: "bg-destructive/10 text-destructive",
 }
 
+const pasaloStatusStyles: Record<PasaloStatus, string> = {
+  none: "bg-muted text-muted-foreground",
+  open: "bg-primary/15 text-primary",
+  pending: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+  completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  cancelled: "bg-destructive/10 text-destructive",
+}
+
 export function MyBookingsPage() {
   const {
     bookings,
     cancelBooking: cancelBookingInStore,
     rescheduleBooking: rescheduleBookingInStore,
+    offerPasalo,
+    cancelPasaloOffer,
   } = useBookings()
   const toast = useToast()
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null)
@@ -57,6 +74,9 @@ export function MyBookingsPage() {
   const [cancelCandidateId, setCancelCandidateId] = useState<string | null>(
     null
   )
+  const [pasaloBookingId, setPasaloBookingId] = useState<string | null>(null)
+  const [pasaloPrice, setPasaloPrice] = useState("")
+  const [pasaloNote, setPasaloNote] = useState("")
 
   const upcomingBookings = bookings.filter(
     (booking) =>
@@ -95,6 +115,39 @@ export function MyBookingsPage() {
     toast.add({
       title: "Booking rescheduled",
       description: `Updated to ${draftDate} · ${draftSlots.join(", ")}`,
+      type: "success",
+    })
+  }
+
+  function startPasaloOffer(booking: Booking) {
+    setPasaloBookingId(booking.id)
+    setPasaloPrice(String(Math.max(1, booking.slots.length * 12)))
+    setPasaloNote(booking.pasalo?.note ?? "")
+    setEditingBookingId(null)
+  }
+
+  function savePasaloOffer(booking: Booking) {
+    const askingPrice = Number(pasaloPrice)
+
+    if (!Number.isFinite(askingPrice) || askingPrice <= 0) {
+      return
+    }
+
+    offerPasalo(booking.id, askingPrice, pasaloNote.trim() || undefined)
+    setPasaloBookingId(null)
+    toast.add({
+      title: "Pasalo offer posted",
+      description: `${booking.id} is now visible on the Pasalo board.`,
+      type: "success",
+    })
+  }
+
+  function cancelPasalo(booking: Booking) {
+    cancelPasaloOffer(booking.id)
+    setPasaloBookingId(null)
+    toast.add({
+      title: "Pasalo offer cancelled",
+      description: `${booking.id} is no longer listed for transfer.`,
       type: "success",
     })
   }
@@ -174,7 +227,6 @@ export function MyBookingsPage() {
               create a new booking.
             </p>
           </div>
-
           <section className="grid gap-3">
             <h2 className="text-base font-semibold">Upcoming</h2>
             <div className="grid gap-3">
@@ -186,14 +238,23 @@ export function MyBookingsPage() {
                   draftDate={draftDate}
                   draftSlots={draftSlots}
                   isConfirmingCancel={cancelCandidateId === booking.id}
+                  isOfferingPasalo={pasaloBookingId === booking.id}
+                  pasaloPrice={pasaloPrice}
+                  pasaloNote={pasaloNote}
                   onRequestCancel={() => requestCancel(booking.id)}
                   onConfirmCancel={() => confirmCancel(booking.id)}
                   onDismissCancel={dismissCancel}
                   onEdit={() => startReschedule(booking)}
+                  onStartPasalo={() => startPasaloOffer(booking)}
+                  onSavePasalo={() => savePasaloOffer(booking)}
+                  onCancelPasalo={() => cancelPasalo(booking)}
+                  onPasaloPriceChange={setPasaloPrice}
+                  onPasaloNoteChange={setPasaloNote}
                   onDraftDateChange={setDraftDate}
                   onDraftSlotToggle={toggleDraftSlot}
                   onSave={() => saveReschedule(booking.id)}
                   onStopEditing={() => setEditingBookingId(null)}
+                  onStopPasalo={() => setPasaloBookingId(null)}
                 />
               ))}
             </div>
@@ -262,6 +323,16 @@ export function MyBookingsPage() {
                 <CalendarDays className="size-4" aria-hidden="true" />
                 Book another court
               </Link>
+              <Link
+                to="/pasalo"
+                className={buttonVariants({
+                  variant: "outline",
+                  className: "w-full",
+                })}
+              >
+                <RefreshCw className="size-4" aria-hidden="true" />
+                View Pasalo board
+              </Link>
             </CardContent>
           </Card>
         </aside>
@@ -274,33 +345,57 @@ function BookingRow({
   booking,
   compact = false,
   isEditing = false,
+  isOfferingPasalo = false,
   draftDate = "",
   draftSlots = [],
+  pasaloPrice = "",
+  pasaloNote = "",
   isConfirmingCancel = false,
   onRequestCancel,
   onConfirmCancel,
   onDismissCancel,
   onEdit,
+  onStartPasalo,
+  onSavePasalo,
+  onCancelPasalo,
+  onPasaloPriceChange,
+  onPasaloNoteChange,
   onDraftDateChange,
   onDraftSlotToggle,
   onSave,
   onStopEditing,
+  onStopPasalo,
 }: {
   booking: Booking
   compact?: boolean
   isEditing?: boolean
+  isOfferingPasalo?: boolean
   draftDate?: string
   draftSlots?: string[]
+  pasaloPrice?: string
+  pasaloNote?: string
   isConfirmingCancel?: boolean
   onRequestCancel?: () => void
   onConfirmCancel?: () => void
   onDismissCancel?: () => void
   onEdit?: () => void
+  onStartPasalo?: () => void
+  onSavePasalo?: () => void
+  onCancelPasalo?: () => void
+  onPasaloPriceChange?: (value: string) => void
+  onPasaloNoteChange?: (value: string) => void
   onDraftDateChange?: (date: string) => void
   onDraftSlotToggle?: (slot: string) => void
   onSave?: () => void
   onStopEditing?: () => void
+  onStopPasalo?: () => void
 }) {
+  const pasaloStatus = booking.pasalo?.status ?? "none"
+  const canOfferPasalo =
+    booking.bookingType === "private" &&
+    booking.status === "confirmed" &&
+    (pasaloStatus === "none" || pasaloStatus === "cancelled")
+
   return (
     <div className="rounded-lg border bg-card p-4 shadow-xs">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -314,6 +409,23 @@ function BookingRow({
               )}
             >
               {booking.status}
+            </span>
+            {pasaloStatus !== "none" ? (
+              <span
+                className={cn(
+                  "rounded-md px-2 py-1 text-xs font-medium capitalize",
+                  pasaloStatusStyles[pasaloStatus]
+                )}
+              >
+                Pasalo {pasaloStatus}
+              </span>
+            ) : null}
+            <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+              {booking.bookingType === "open_play"
+                ? "Open Play"
+                : booking.bookingType === "whole_gym"
+                  ? "Whole Gym"
+                  : "Private"}
             </span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -331,9 +443,39 @@ function BookingRow({
             </span>
           </div>
           <p className="text-sm">
-            <span className="text-muted-foreground">Court:</span>{" "}
+            <span className="text-muted-foreground">
+              {booking.bookingType === "whole_gym" ? "Coverage:" : "Court:"}
+            </span>{" "}
             <span className="font-medium">{booking.court}</span>
           </p>
+          {booking.bookingType === "open_play" ? (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Seat count:</span>{" "}
+              <span className="font-medium">{booking.participantCount}</span>
+            </p>
+          ) : booking.bookingType === "whole_gym" ? (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Expected players:</span>{" "}
+              <span className="font-medium">{booking.participantCount}</span>
+            </p>
+          ) : null}
+          {booking.ownerName || booking.ownerEmail ? (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Booked under:</span>{" "}
+              <span className="font-medium">
+                {booking.ownerName ?? booking.ownerEmail}
+              </span>
+            </p>
+          ) : null}
+          {booking.pasalo?.askingPrice ? (
+            <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <BadgeDollarSign className="size-4" aria-hidden="true" />
+              Pasalo asking price:{" "}
+              <span className="font-medium text-foreground">
+                ${booking.pasalo.askingPrice}
+              </span>
+            </p>
+          ) : null}
         </div>
 
         {!compact ? (
@@ -360,21 +502,45 @@ function BookingRow({
               </Button>
             </div>
           ) : (
-            <div className="flex shrink-0 gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={onEdit}
+                disabled={pasaloStatus === "open" || pasaloStatus === "pending"}
               >
                 <RotateCcw className="size-4" aria-hidden="true" />
                 Reschedule
               </Button>
+              {pasaloStatus === "open" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onCancelPasalo}
+                >
+                  <RefreshCw className="size-4" aria-hidden="true" />
+                  Cancel Pasalo
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onStartPasalo}
+                  disabled={!canOfferPasalo}
+                >
+                  <RefreshCw className="size-4" aria-hidden="true" />
+                  Offer as Pasalo
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="destructive"
                 size="sm"
                 onClick={onRequestCancel}
+                disabled={pasaloStatus === "pending"}
               >
                 <XCircle className="size-4" aria-hidden="true" />
                 Cancel
@@ -425,6 +591,50 @@ function BookingRow({
               onClick={onStopEditing}
             >
               Keep current booking
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {isOfferingPasalo ? (
+        <div className="mt-4 grid gap-4 rounded-lg bg-muted p-4">
+          <div className="grid gap-2 sm:max-w-xs">
+            <Label htmlFor={`${booking.id}-pasalo-price`}>Asking price</Label>
+            <Input
+              id={`${booking.id}-pasalo-price`}
+              type="number"
+              min="1"
+              value={pasaloPrice}
+              onChange={(event) => onPasaloPriceChange?.(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`${booking.id}-pasalo-note`}>Note to players</Label>
+            <textarea
+              id={`${booking.id}-pasalo-note`}
+              value={pasaloNote}
+              onChange={(event) => onPasaloNoteChange?.(event.target.value)}
+              placeholder="Optional reason, meetup detail, or transfer note"
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={onSavePasalo}
+              disabled={Number(pasaloPrice) <= 0}
+            >
+              <RefreshCw className="size-4" aria-hidden="true" />
+              Post Pasalo offer
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onStopPasalo}
+            >
+              Keep booking
             </Button>
           </div>
         </div>

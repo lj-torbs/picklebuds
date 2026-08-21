@@ -5,8 +5,8 @@ import { AdminShell } from "@/admin/components/layout/admin-shell"
 import { AdminDashboardPage } from "@/admin/pages/admin-dashboard-page"
 import { AdminGymsPage } from "@/admin/pages/admin-gyms-page"
 import { AdminLoginPage } from "@/admin/pages/admin-login-page"
+import { AdminOwnersPage } from "@/admin/pages/admin-owners-page"
 import { AdminTransactionsPage } from "@/admin/pages/admin-transactions-page"
-import { AdminUsersPage } from "@/admin/pages/admin-users-page"
 import { RequireAuth } from "@/components/auth/require-auth"
 import { OwnerShell } from "@/owner/components/layout/owner-shell"
 import { RequireOwnerAuth } from "@/owner/components/require-owner-auth"
@@ -21,6 +21,8 @@ import { LandingPage } from "@/pages/landing-page"
 import { LoginPage } from "@/pages/login-page"
 import { MyBookingsPage } from "@/pages/my-bookings-page"
 import { NotificationsPage } from "@/pages/notifications-page"
+import { OpenPlayPage } from "@/pages/open-play-page"
+import { PasaloPage } from "@/pages/pasalo-page"
 import { ProfilePage } from "@/pages/profile-page"
 import { SignupPage } from "@/pages/signup-page"
 
@@ -34,6 +36,8 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route path="/booking" element={<BookingPage />} />
         <Route path="/booking/:gymId" element={<GymDetailPage />} />
+        <Route path="/open-play" element={<OpenPlayPage />} />
+        <Route path="/pasalo" element={<PasaloPage />} />
         <Route path="/my-bookings" element={<MyBookingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
@@ -45,7 +49,8 @@ export function App() {
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="transactions" element={<AdminTransactionsPage />} />
           <Route path="gyms" element={<AdminGymsPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="owners" element={<AdminOwnersPage />} />
+          <Route path="users" element={<Navigate to="/admin/owners" replace />} />
         </Route>
       </Route>
       <Route path="/owner/login" element={<OwnerLoginPage />} />

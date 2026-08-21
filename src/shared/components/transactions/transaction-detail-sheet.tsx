@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  CircleAlert,
   Clock3,
   Image,
   Mail,
@@ -40,6 +41,9 @@ export function TransactionDetailSheet({
   onCancel: (id: string) => void
   onRefund: (id: string) => void
 }) {
+  const canApprove = transaction?.status === "pending" && !!transaction.paymentReceipt
+  const canComplete = transaction?.status === "confirmed"
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-md">
@@ -112,6 +116,17 @@ export function TransactionDetailSheet({
                 </div>
               </div>
 
+              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-800 dark:text-yellow-300">
+                <div className="inline-flex items-start gap-2">
+                  <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <p>
+                    Review the payment method, reference number, sender name,
+                    and uploaded receipt before approval. Approval is a manual
+                    owner judgment call in this prototype.
+                  </p>
+                </div>
+              </div>
+
               {transaction.paymentReceipt ? (
                 <div className="grid gap-3 rounded-lg border bg-card p-3 text-sm">
                   <span className="inline-flex items-center gap-1.5 font-medium">
@@ -119,9 +134,15 @@ export function TransactionDetailSheet({
                       className="size-4 text-muted-foreground"
                       aria-hidden="true"
                     />
-                    GCash receipt
+                    Payment proof
                   </span>
-                  <div className="grid gap-1 text-muted-foreground">
+                  <div className="grid gap-1 rounded-lg bg-muted/30 p-3 text-muted-foreground">
+                    <span>
+                      Method:{" "}
+                      <span className="font-medium text-foreground">
+                        {transaction.paymentMethod}
+                      </span>
+                    </span>
                     <span>
                       Reference:{" "}
                       <span className="font-medium text-foreground">
@@ -143,16 +164,20 @@ export function TransactionDetailSheet({
                   >
                     <img
                       src={transaction.paymentReceipt.imageUrl}
-                      alt={`GCash receipt for ${transaction.id}`}
+                      alt={`Payment proof for ${transaction.id}`}
                       className="max-h-72 w-full object-contain"
                     />
                   </a>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     <Image className="size-3.5" aria-hidden="true" />
                     {transaction.paymentReceipt.fileName}
                   </span>
                 </div>
-              ) : null}
+              ) : (
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-800 dark:text-yellow-300">
+                  No payment proof has been uploaded for this booking yet.
+                </div>
+              )}
             </div>
 
             <SheetFooter className="grid grid-cols-2 gap-2">
@@ -160,16 +185,16 @@ export function TransactionDetailSheet({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={transaction.status === "confirmed"}
+                disabled={!canApprove}
                 onClick={() => onConfirm(transaction.id)}
               >
-                Confirm
+                Approve payment
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={transaction.status === "completed"}
+                disabled={!canComplete}
                 onClick={() => onComplete(transaction.id)}
               >
                 Mark completed

@@ -39,7 +39,22 @@ export function OwnerLoginPage() {
       return
     }
 
-    login({ email: sanitizedEmail, password })
+    const result = login({ email: sanitizedEmail, password })
+    if (!result.ok) {
+      toast.add({
+        title:
+          result.reason === "payment_due"
+            ? "System payment required"
+            : "Owner access suspended",
+        description:
+          result.reason === "payment_due"
+            ? "You need to pay first before you can access the owner dashboard."
+            : "Your owner account is currently suspended. Contact the admin first.",
+        type: "error",
+      })
+      return
+    }
+
     toast.add({
       title: "Welcome back",
       description: `Signed in as ${sanitizedEmail}`,

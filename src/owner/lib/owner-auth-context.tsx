@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import { useAdminOwners } from "@/admin/lib/admin-owners-context"
+
 type OwnerUser = {
   id: string
   name: string
@@ -12,18 +14,18 @@ type OwnerLoginInput = {
   password: string
 }
 
+type OwnerLoginResult =
+  | { ok: true; owner: OwnerUser }
+  | { ok: false; reason: "payment_due" | "suspended" }
+
 type OwnerAuthContextValue = {
   owner: OwnerUser | null
-  login: (input: OwnerLoginInput) => void
+  login: (input: OwnerLoginInput) => OwnerLoginResult
   logout: () => void
 }
 
 const STORAGE_KEY = "pb-owner-auth-user"
 
-// Demo mapping only: this prototype has no backend, so login is matched
-// against a fixed list of demo owner accounts. Any other email still logs
-// in (consistent with the rest of the app's mock auth) and defaults to the
-// first demo owner so the "My gyms" flow always has data to show.
 const demoOwnerAccounts: OwnerUser[] = [
   { id: "owner-1", name: "Priya Nair", email: "priya@northsidepb.com" },
   { id: "owner-2", name: "Marcus Diaz", email: "marcus@riversidesports.com" },
@@ -57,14 +59,8 @@ function readStoredOwner(): OwnerUser | null {
   }
 }
 
-function resolveOwner(email: string): OwnerUser {
-  const match = demoOwnerAccounts.find(
-    (account) => account.email.toLowerCase() === email.toLowerCase()
-  )
-  return match ?? { ...demoOwnerAccounts[0], email }
-}
-
 export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
+  const { owners } = useAdminOwners()
   const [owner, setOwner] = React.useState<OwnerUser | null>(readStoredOwner)
 
   const persistOwner = React.useCallback((nextOwner: OwnerUser | null) => {
@@ -77,10 +73,37 @@ export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = React.useCallback(
-    ({ email }: OwnerLoginInput) => {
-      persistOwner(resolveOwner(email))
+    ({ email }: OwnerLoginInput): OwnerLoginResult => {
+      const matchedRecord =
+        owners.find((record) => record.email.toLowerCase() === email.toLowerCase()) ??
+        null
+      const matchedOwner =
+        matchedRecord ??
+        demoOwnerAccounts.find(
+          (account) => account.email.toLowerCase() === email.toLowerCase()
+        ) ??
+        { ...demoOwnerAccounts[0], email }
+
+      if (matchedRecord?.status === "suspended") {
+        return {
+          ok: false,
+          reason:
+            matchedRecord.suspensionReason === "system_payment_due"
+              ? "payment_due"
+              : "suspended",
+        }
+      }
+
+      const resolvedOwner = {
+        id: matchedOwner.id,
+        name: matchedOwner.name,
+        email: matchedOwner.email,
+      }
+
+      persistOwner(resolvedOwner)
+      return { ok: true, owner: resolvedOwner }
     },
-    [persistOwner]
+    [owners, persistOwner]
   )
 
   const logout = React.useCallback(() => {

@@ -1,11 +1,15 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
-import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
+import {
+  createMockPaymentReceipt,
+  type PaymentReceipt,
+} from "@/shared/lib/payment-receipt"
 
 export type TransactionStatus =
   "confirmed" | "pending" | "completed" | "cancelled"
 export type PaymentStatus = "paid" | "unpaid" | "refunded"
+export type TransactionType = "private" | "open_play" | "whole_gym"
 
 export type Transaction = {
   id: string
@@ -17,6 +21,8 @@ export type Transaction = {
   court: string
   date: string
   slots: string[]
+  bookingType: TransactionType
+  participantCount: number
   amount: number
   paymentMethod: string
   paymentStatus: PaymentStatus
@@ -38,6 +44,31 @@ type TransactionsContextValue = {
 
 const initialTransactions: Transaction[] = [
   {
+    id: "PB-1066",
+    customerName: "Apex Systems Sports Club",
+    customerEmail: "events@apexsystems.example.com",
+    gymId: "northside",
+    gym: "Tagum Pickleball Hub",
+    courtId: "whole-gym",
+    court: "Whole gym",
+    date: "2026-08-27",
+    slots: ["4:00 PM", "7:00 PM"],
+    bookingType: "whole_gym",
+    participantCount: 24,
+    amount: 68,
+    paymentMethod: "Bank Transfer QR payment",
+    paymentStatus: "paid",
+    status: "pending",
+    createdAt: "2026-08-21T09:18:00Z",
+    paymentReceipt: createMockPaymentReceipt({
+      venue: "Tagum Pickleball Hub",
+      accountName: "Apex Systems Sports Club",
+      referenceNumber: "BANK-20260821-1066",
+      amount: 68,
+      uploadedAt: "2026-08-21 05:18 PM",
+    }),
+  },
+  {
     id: "PB-1042",
     customerName: "Jordan Alcaraz",
     customerEmail: "jordan.alcaraz@example.com",
@@ -45,13 +76,15 @@ const initialTransactions: Transaction[] = [
     gym: "Tagum Pickleball Hub",
     courtId: "northside-b",
     court: "Court B",
-    date: "2026-07-12",
+    date: "2026-08-24",
     slots: ["10:00 AM", "2:30 PM"],
+    bookingType: "private",
+    participantCount: 1,
     amount: 24,
     paymentMethod: "Visa •••• 4821",
     paymentStatus: "paid",
     status: "confirmed",
-    createdAt: "2026-07-08T09:14:00Z",
+    createdAt: "2026-08-19T09:14:00Z",
   },
   {
     id: "PB-1043",
@@ -61,13 +94,22 @@ const initialTransactions: Transaction[] = [
     gym: "Mankilam Court Club",
     courtId: "central-2",
     court: "Court 2",
-    date: "2026-07-15",
+    date: "2026-08-26",
     slots: ["5:00 PM", "8:00 PM"],
+    bookingType: "private",
+    participantCount: 1,
     amount: 32,
     paymentMethod: "GCash",
     paymentStatus: "paid",
     status: "pending",
-    createdAt: "2026-07-10T14:02:00Z",
+    createdAt: "2026-08-20T14:02:00Z",
+    paymentReceipt: createMockPaymentReceipt({
+      venue: "Mankilam Court Club",
+      accountName: "Mika Santos",
+      referenceNumber: "GCASH-20260820-1043",
+      amount: 32,
+      uploadedAt: "2026-08-20 10:18 PM",
+    }),
   },
   {
     id: "PB-1019",
@@ -79,6 +121,8 @@ const initialTransactions: Transaction[] = [
     court: "Main Court",
     date: "2026-07-05",
     slots: ["7:30 AM"],
+    bookingType: "private",
+    participantCount: 1,
     amount: 12,
     paymentMethod: "Mastercard •••• 0093",
     paymentStatus: "paid",
@@ -93,13 +137,22 @@ const initialTransactions: Transaction[] = [
     gym: "Tagum Pickleball Hub",
     courtId: "northside-a",
     court: "Court A",
-    date: "2026-07-20",
+    date: "2026-08-28",
     slots: ["9:30 AM"],
+    bookingType: "private",
+    participantCount: 1,
     amount: 12,
     paymentMethod: "Visa •••• 7710",
     paymentStatus: "unpaid",
     status: "pending",
-    createdAt: "2026-07-16T11:45:00Z",
+    createdAt: "2026-08-21T11:45:00Z",
+    paymentReceipt: createMockPaymentReceipt({
+      venue: "Tagum Pickleball Hub",
+      accountName: "Ava Reyes",
+      referenceNumber: "GCASH-20260821-1051",
+      amount: 12,
+      uploadedAt: "2026-08-21 7:45 PM",
+    }),
   },
   {
     id: "PB-1038",
@@ -111,6 +164,8 @@ const initialTransactions: Transaction[] = [
     court: "Court 1",
     date: "2026-07-09",
     slots: ["11:00 AM", "2:00 PM"],
+    bookingType: "private",
+    participantCount: 1,
     amount: 24,
     paymentMethod: "GCash",
     paymentStatus: "refunded",
@@ -127,6 +182,8 @@ const initialTransactions: Transaction[] = [
     court: "Main Court",
     date: "2026-06-29",
     slots: ["3:30 PM"],
+    bookingType: "private",
+    participantCount: 1,
     amount: 12,
     paymentMethod: "Mastercard •••• 5541",
     paymentStatus: "paid",
@@ -161,7 +218,18 @@ export function TransactionsProvider({
     (id: string, status: TransactionStatus) => {
       setTransactions((current) =>
         current.map((transaction) =>
-          transaction.id === id ? { ...transaction, status } : transaction
+          transaction.id === id
+            ? {
+                ...transaction,
+                status,
+                paymentStatus:
+                  status === "confirmed" || status === "completed"
+                    ? transaction.paymentReceipt
+                      ? "paid"
+                      : transaction.paymentStatus
+                    : transaction.paymentStatus,
+              }
+            : transaction
         )
       )
     },

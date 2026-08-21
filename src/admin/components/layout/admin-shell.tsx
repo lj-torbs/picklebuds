@@ -15,7 +15,7 @@ const pageTitles: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
   "/admin/transactions": "Transactions",
   "/admin/gyms": "Gyms & Courts",
-  "/admin/users": "Users",
+  "/admin/owners": "Owners",
 }
 
 export function AdminShell() {
