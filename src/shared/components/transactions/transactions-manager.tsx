@@ -44,8 +44,8 @@ export function TransactionsManager({
   transactions: Transaction[]
   searchPlaceholder?: string
   enableReporting?: boolean
-  onSetStatus: (id: string, status: TransactionStatus) => void
-  onRefund: (id: string) => void
+  onSetStatus: (id: string, status: TransactionStatus) => void | Promise<void>
+  onRefund: (id: string) => void | Promise<void>
 }) {
   const toast = useToast()
 
@@ -59,6 +59,9 @@ export function TransactionsManager({
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [selectedTransactionId, setSelectedTransactionId] = useState<
+    string | null
+  >(null)
+  const [submittingTransactionId, setSubmittingTransactionId] = useState<
     string | null
   >(null)
 
@@ -155,22 +158,52 @@ export function TransactionsManager({
     setDateTo("")
   }
 
-  function handleStatusChange(id: string, status: TransactionStatus) {
-    onSetStatus(id, status)
-    toast.add({
-      title: "Transaction updated",
-      description: `${id} marked as ${status}.`,
-      type: "success",
-    })
+  async function handleStatusChange(id: string, status: TransactionStatus) {
+    setSubmittingTransactionId(id)
+    try {
+      await onSetStatus(id, status)
+      toast.add({
+        title: "Transaction updated",
+        description: `${id} marked as ${status}.`,
+        type: "success",
+      })
+    } catch (error) {
+      const description =
+        error instanceof Error
+          ? error.message
+          : "Unable to update the transaction right now."
+      toast.add({
+        title: "Update failed",
+        description,
+        type: "error",
+      })
+    } finally {
+      setSubmittingTransactionId(null)
+    }
   }
 
-  function handleRefund(id: string) {
-    onRefund(id)
-    toast.add({
-      title: "Payment refunded",
-      description: `${id} has been refunded and cancelled.`,
-      type: "success",
-    })
+  async function handleRefund(id: string) {
+    setSubmittingTransactionId(id)
+    try {
+      await onRefund(id)
+      toast.add({
+        title: "Payment refunded",
+        description: `${id} has been refunded and cancelled.`,
+        type: "success",
+      })
+    } catch (error) {
+      const description =
+        error instanceof Error
+          ? error.message
+          : "Unable to refund the transaction right now."
+      toast.add({
+        title: "Refund failed",
+        description,
+        type: "error",
+      })
+    } finally {
+      setSubmittingTransactionId(null)
+    }
   }
 
   return (
@@ -369,6 +402,7 @@ export function TransactionsManager({
             setSelectedTransactionId(null)
           }
         }}
+        isSubmitting={submittingTransactionId === selectedTransactionId}
         onConfirm={(id) => handleStatusChange(id, "confirmed")}
         onComplete={(id) => handleStatusChange(id, "completed")}
         onCancel={(id) => handleStatusChange(id, "cancelled")}

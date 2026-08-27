@@ -13,11 +13,9 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/toast"
 import { loginSchema, sanitizeEmail } from "@/lib/validation"
 
 export function ForgotPasswordPage() {
-  const toast = useToast()
   const [email, setEmail] = useState("")
   const [error, setError] = useState("")
   const [sent, setSent] = useState(false)
@@ -36,11 +34,6 @@ export function ForgotPasswordPage() {
 
     setError("")
     setSent(true)
-    toast.add({
-      title: "Check your inbox",
-      description: `If an account exists for ${result.data}, reset instructions are on the way.`,
-      type: "success",
-    })
   }
 
   return (
@@ -62,10 +55,15 @@ export function ForgotPasswordPage() {
 
         <CardContent>
           {sent ? (
-            <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-              If an account exists for that email, a reset link is on its way.
-              It can take a few minutes to arrive.
-            </p>
+            <div className="grid gap-3">
+              <p className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm text-primary">
+                If an account exists for {sanitizeEmail(email)}, reset instructions
+                are on the way.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                It can take a few minutes to arrive.
+              </p>
+            </div>
           ) : (
             <form className="grid gap-5" onSubmit={handleSubmit}>
               <div className="grid gap-2">

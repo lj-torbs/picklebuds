@@ -34,6 +34,7 @@ import type {
   BookingStatus,
   PasaloStatus,
 } from "@/lib/bookings-context"
+import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
 import { getRentalTotal } from "@/shared/lib/gyms-context"
@@ -63,6 +64,7 @@ const pasaloStatusStyles: Record<PasaloStatus, string> = {
 }
 
 export function MyBookingsPage() {
+  const { user } = useAuth()
   const {
     bookings,
     cancelBooking: cancelBookingInStore,
@@ -81,14 +83,18 @@ export function MyBookingsPage() {
   const [pasaloPrice, setPasaloPrice] = useState("")
   const [pasaloNote, setPasaloNote] = useState("")
 
-  const upcomingBookings = bookings.filter(
+  const visibleBookings = user?.email
+    ? bookings.filter((booking) => booking.ownerEmail === user.email)
+    : bookings
+
+  const upcomingBookings = visibleBookings.filter(
     (booking) =>
       booking.status !== "completed" && booking.status !== "cancelled"
   )
-  const completedBookings = bookings.filter(
+  const completedBookings = visibleBookings.filter(
     (booking) => booking.status === "completed"
   )
-  const cancelledBookings = bookings.filter(
+  const cancelledBookings = visibleBookings.filter(
     (booking) => booking.status === "cancelled"
   )
 
@@ -289,7 +295,7 @@ export function MyBookingsPage() {
             <CardHeader>
               <CardTitle>Booking overview</CardTitle>
               <CardDescription>
-                Your current frontend sample reservations.
+                Your current reservations under this account.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">

@@ -2,11 +2,14 @@
 import * as React from "react"
 
 import { useAdminOwners } from "@/admin/lib/admin-owners-context"
+import { AuthApiError, loginWithApi } from "@/lib/auth-api"
+import { persistStorageItem, readStorageItem } from "@/lib/auth-storage"
 
 type OwnerUser = {
   id: string
   name: string
   email: string
+  token?: string
 }
 
 type OwnerLoginInput = {
@@ -16,11 +19,19 @@ type OwnerLoginInput = {
 
 type OwnerLoginResult =
   | { ok: true; owner: OwnerUser }
-  | { ok: false; reason: "payment_due" | "suspended" }
+  | {
+      ok: false
+      reason:
+        | "payment_due"
+        | "suspended"
+        | "invalid_credentials"
+        | "rate_limited"
+      message?: string
+    }
 
 type OwnerAuthContextValue = {
   owner: OwnerUser | null
-  login: (input: OwnerLoginInput) => OwnerLoginResult
+  login: (input: OwnerLoginInput) => Promise<OwnerLoginResult>
   logout: () => void
 }
 
@@ -46,17 +57,7 @@ function isOwnerUser(value: unknown): value is OwnerUser {
 }
 
 function readStoredOwner(): OwnerUser | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-    return isOwnerUser(parsed) ? parsed : null
-  } catch {
-    return null
-  }
+  return readStorageItem(STORAGE_KEY, isOwnerUser)
 }
 
 export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
@@ -65,43 +66,47 @@ export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
 
   const persistOwner = React.useCallback((nextOwner: OwnerUser | null) => {
     setOwner(nextOwner)
-    if (nextOwner) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextOwner))
-    } else {
-      localStorage.removeItem(STORAGE_KEY)
-    }
+    persistStorageItem(STORAGE_KEY, nextOwner)
   }, [])
 
   const login = React.useCallback(
-    ({ email }: OwnerLoginInput): OwnerLoginResult => {
-      const matchedRecord =
-        owners.find((record) => record.email.toLowerCase() === email.toLowerCase()) ??
-        null
-      const matchedOwner =
-        matchedRecord ??
-        demoOwnerAccounts.find(
-          (account) => account.email.toLowerCase() === email.toLowerCase()
-        ) ??
-        { ...demoOwnerAccounts[0], email }
+    async ({ email, password }: OwnerLoginInput): Promise<OwnerLoginResult> => {
+      try {
+        const session = await loginWithApi(email, password, "owner")
+        const matchedRecord =
+          owners.find(
+            (record) =>
+              record.email.toLowerCase() === session.user.email.toLowerCase()
+          ) ??
+          demoOwnerAccounts.find(
+            (account) =>
+              account.email.toLowerCase() === session.user.email.toLowerCase()
+          ) ??
+          null
 
-      if (matchedRecord?.status === "suspended") {
-        return {
-          ok: false,
-          reason:
-            matchedRecord.suspensionReason === "system_payment_due"
-              ? "payment_due"
-              : "suspended",
+        const resolvedOwner = {
+          id: matchedRecord?.id ?? session.user.public_id,
+          name: session.user.full_name,
+          email: session.user.email,
+          token: session.access_token,
         }
-      }
 
-      const resolvedOwner = {
-        id: matchedOwner.id,
-        name: matchedOwner.name,
-        email: matchedOwner.email,
+        persistOwner(resolvedOwner)
+        return { ok: true, owner: resolvedOwner }
+      } catch (error) {
+        if (error instanceof AuthApiError) {
+          if (error.status === 429) {
+            return { ok: false, reason: "rate_limited", message: error.message }
+          }
+          if (error.message.includes("locked until system payment")) {
+            return { ok: false, reason: "payment_due" }
+          }
+          if (error.message.includes("suspended")) {
+            return { ok: false, reason: "suspended" }
+          }
+        }
+        return { ok: false, reason: "invalid_credentials" }
       }
-
-      persistOwner(resolvedOwner)
-      return { ok: true, owner: resolvedOwner }
     },
     [owners, persistOwner]
   )

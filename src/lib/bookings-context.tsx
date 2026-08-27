@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import { getMyBookingsWithApi, type MyBookingApiItem } from "@/lib/booking-api"
+import { useAuth } from "@/lib/auth-context"
 import {
   createMockPaymentReceipt,
   type PaymentReceipt,
@@ -41,8 +43,10 @@ export type Booking = {
   pasalo?: PasaloOffer
 }
 
-
-type NewBooking = Omit<Booking, "id" | "status"> & { status?: BookingStatus }
+type NewBooking = Omit<Booking, "id" | "status"> & {
+  id?: string
+  status?: BookingStatus
+}
 type PasaloClaimInput = {
   claimantName: string
   claimantEmail: string
@@ -250,14 +254,70 @@ const BookingsContext = React.createContext<BookingsContextValue | undefined>(
   undefined
 )
 
+function mapApiBookingToBooking(booking: MyBookingApiItem): Booking {
+  return {
+    id: booking.public_id,
+    gymId: booking.venue_public_id,
+    gym: booking.venue_name,
+    address: booking.venue_address,
+    courtId: booking.court_public_id ?? "whole-gym",
+    court: booking.court_name ?? "Whole gym",
+    date: booking.booking_date,
+    slots: booking.slot_labels,
+    status: booking.status,
+    bookingType: booking.booking_type,
+    participantCount: booking.participant_count,
+    ownerName: booking.booked_by_name,
+    ownerEmail: booking.booked_by_email,
+    rentals: booking.rentals.map((rental) => ({
+      itemId: rental.rental_item_public_id,
+      name: rental.item_name,
+      category: rental.category,
+      pricePerSession: rental.price_per_session,
+      quantity: rental.quantity,
+    })),
+  }
+}
+
 export function BookingsProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
   const [bookings, setBookings] = React.useState<Booking[]>(initialBookings)
   const nextIdRef = React.useRef(1067)
+
+  React.useEffect(() => {
+    if (!user?.token || !user.email) {
+      return
+    }
+
+    let isActive = true
+
+    void getMyBookingsWithApi(user.token)
+      .then((items) => {
+        if (!isActive) {
+          return
+        }
+
+        const remoteBookings = items.map(mapApiBookingToBooking)
+        setBookings((current) => {
+          const preservedBookings = current.filter(
+            (booking) => booking.ownerEmail !== user.email
+          )
+          return [...remoteBookings, ...preservedBookings]
+        })
+      })
+      .catch(() => {
+        // Leave prototype data in place if the backend is unavailable.
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [user?.email, user?.token])
 
   const addBooking = React.useCallback((booking: NewBooking) => {
     const created: Booking = {
       ...booking,
-      id: `PB-${nextIdRef.current++}`,
+      id: booking.id ?? `PB-${nextIdRef.current++}`,
       status: booking.status ?? "confirmed",
       bookingType: booking.bookingType ?? "private",
       participantCount: booking.participantCount ?? 1,

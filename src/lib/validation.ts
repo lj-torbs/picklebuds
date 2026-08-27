@@ -35,8 +35,8 @@ const signupPasswordSchema = z
   .min(8, "Password must be at least 8 characters.")
   .max(64, "Password must be under 64 characters.")
   .regex(
-    /^[A-Za-z0-9]+$/,
-    "Password can only contain letters and numbers (no spaces or symbols)."
+    /^(?=.*[A-Za-z])(?=.*\d).+$/,
+    "Password must include at least one letter and one number."
   )
 
 export const loginSchema = z.object({

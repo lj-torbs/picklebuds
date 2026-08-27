@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { CalendarCheck, Lock, Mail, ShieldCheck } from "lucide-react"
+import { CalendarCheck, Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react"
 
 import { useAdminAuth } from "@/admin/lib/admin-auth-context"
 import { Button } from "@/components/ui/button"
@@ -14,37 +14,50 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/toast"
+import { getAuthErrorMessage } from "@/lib/auth-api"
 import { sanitizeEmail } from "@/lib/validation"
 
 export function AdminLoginPage() {
   const { login } = useAdminAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const toast = useToast()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [formMessage, setFormMessage] = useState<string | null>(null)
+  const isSubmittingRef = useRef(false)
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
-    const sanitizedEmail = sanitizeEmail(email)
-    if (!sanitizedEmail || !password) {
-      toast.add({
-        title: "Check your details",
-        description: "Email and password are required.",
-        type: "error",
-      })
+    if (isSubmittingRef.current) {
       return
     }
 
-    login({ email: sanitizedEmail, password })
-    toast.add({
-      title: "Welcome back",
-      description: `Signed in as ${sanitizedEmail}`,
-      type: "success",
-    })
+    const sanitizedEmail = sanitizeEmail(email)
+    if (!sanitizedEmail || !password) {
+      setFormMessage("Email and password are required.")
+      return
+    }
+
+    setFormMessage(null)
+    isSubmittingRef.current = true
+    setIsSubmitting(true)
+    try {
+      await login({ email: sanitizedEmail, password })
+    } catch (error) {
+      setFormMessage(
+        getAuthErrorMessage(
+          error,
+          "Invalid email, password, or role."
+        )
+      )
+      return
+    } finally {
+      isSubmittingRef.current = false
+      setIsSubmitting(false)
+    }
 
     const state = location.state as { from?: { pathname?: string } } | null
     navigate(state?.from?.pathname ?? "/admin/dashboard", { replace: true })
@@ -69,6 +82,11 @@ export function AdminLoginPage() {
             className="grid gap-5"
             onSubmit={handleSubmit}
           >
+            {formMessage ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {formMessage}
+              </div>
+            ) : null}
             <div className="grid gap-2">
               <Label htmlFor="admin-email">Email</Label>
               <div className="relative">
@@ -99,12 +117,24 @@ export function AdminLoginPage() {
                 />
                 <Input
                   id="admin-password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   className="pl-8"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute top-1/2 right-2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="size-4" aria-hidden="true" />
+                  )}
+                </button>
               </div>
             </div>
           </form>
@@ -115,8 +145,9 @@ export function AdminLoginPage() {
             type="submit"
             form="admin-login-form"
             className="w-full"
+            disabled={isSubmitting}
           >
-            Log in
+            {isSubmitting ? "Signing in..." : "Log in"}
           </Button>
           <Link
             to="/"

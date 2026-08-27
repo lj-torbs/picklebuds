@@ -1,9 +1,15 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import { loginWithApi } from "@/lib/auth-api"
+import { persistStorageItem, readStorageItem } from "@/lib/auth-storage"
+
 type AdminUser = {
+  id?: number
+  publicId?: string
   name: string
   email: string
+  token?: string
 }
 
 type AdminLoginInput = {
@@ -13,7 +19,7 @@ type AdminLoginInput = {
 
 type AdminAuthContextValue = {
   admin: AdminUser | null
-  login: (input: AdminLoginInput) => void
+  login: (input: AdminLoginInput) => Promise<void>
   logout: () => void
 }
 
@@ -33,31 +39,7 @@ function isAdminUser(value: unknown): value is AdminUser {
 }
 
 function readStoredAdmin(): AdminUser | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-    return isAdminUser(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-function deriveNameFromEmail(email: string) {
-  const [local] = email.split("@")
-  if (!local) {
-    return "Admin"
-  }
-
-  return local
-    .replace(/[._-]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0]!.toUpperCase() + part.slice(1))
-    .join(" ")
+  return readStorageItem(STORAGE_KEY, isAdminUser)
 }
 
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
@@ -65,16 +47,19 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const persistAdmin = React.useCallback((nextAdmin: AdminUser | null) => {
     setAdmin(nextAdmin)
-    if (nextAdmin) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAdmin))
-    } else {
-      localStorage.removeItem(STORAGE_KEY)
-    }
+    persistStorageItem(STORAGE_KEY, nextAdmin)
   }, [])
 
   const login = React.useCallback(
-    ({ email }: AdminLoginInput) => {
-      persistAdmin({ name: deriveNameFromEmail(email), email })
+    async ({ email, password }: AdminLoginInput) => {
+      const session = await loginWithApi(email, password, "admin")
+      persistAdmin({
+        id: session.user.id,
+        publicId: session.user.public_id,
+        name: session.user.full_name,
+        email: session.user.email,
+        token: session.access_token,
+      })
     },
     [persistAdmin]
   )

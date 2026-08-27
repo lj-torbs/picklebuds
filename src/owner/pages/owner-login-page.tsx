@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { Building2, CalendarCheck, Lock, Mail } from "lucide-react"
+import { Building2, CalendarCheck, Eye, EyeOff, Lock, Mail } from "lucide-react"
 
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { Button } from "@/components/ui/button"
@@ -14,52 +14,50 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/toast"
 import { sanitizeEmail } from "@/lib/validation"
 
 export function OwnerLoginPage() {
   const { login } = useOwnerAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const toast = useToast()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [formMessage, setFormMessage] = useState<string | null>(null)
+  const isSubmittingRef = useRef(false)
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isSubmittingRef.current) {
+      return
+    }
 
     const sanitizedEmail = sanitizeEmail(email)
     if (!sanitizedEmail || !password) {
-      toast.add({
-        title: "Check your details",
-        description: "Email and password are required.",
-        type: "error",
-      })
+      setFormMessage("Email and password are required.")
       return
     }
 
-    const result = login({ email: sanitizedEmail, password })
+    setFormMessage(null)
+    isSubmittingRef.current = true
+    setIsSubmitting(true)
+    const result = await login({ email: sanitizedEmail, password })
+    isSubmittingRef.current = false
+    setIsSubmitting(false)
     if (!result.ok) {
-      toast.add({
-        title:
-          result.reason === "payment_due"
-            ? "System payment required"
-            : "Owner access suspended",
-        description:
+      setFormMessage(
           result.reason === "payment_due"
             ? "You need to pay first before you can access the owner dashboard."
-            : "Your owner account is currently suspended. Contact the admin first.",
-        type: "error",
-      })
+            : result.reason === "rate_limited"
+              ? (result.message ?? "Too many attempts. Try again in a few minutes.")
+            : result.reason === "suspended"
+              ? "Your owner account is currently suspended. Contact the admin first."
+              : "Invalid email, password, or role."
+      )
       return
     }
-
-    toast.add({
-      title: "Welcome back",
-      description: `Signed in as ${sanitizedEmail}`,
-      type: "success",
-    })
 
     const state = location.state as { from?: { pathname?: string } } | null
     navigate(state?.from?.pathname ?? "/owner/dashboard", { replace: true })
@@ -84,6 +82,11 @@ export function OwnerLoginPage() {
             className="grid gap-5"
             onSubmit={handleSubmit}
           >
+            {formMessage ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {formMessage}
+              </div>
+            ) : null}
             <div className="grid gap-2">
               <Label htmlFor="owner-email">Email</Label>
               <div className="relative">
@@ -114,20 +117,37 @@ export function OwnerLoginPage() {
                 />
                 <Input
                   id="owner-password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   className="pl-8"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute top-1/2 right-2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="size-4" aria-hidden="true" />
+                  )}
+                </button>
               </div>
             </div>
           </form>
         </CardContent>
 
         <CardFooter className="flex-col gap-3">
-          <Button type="submit" form="owner-login-form" className="w-full">
-            Log in
+          <Button
+            type="submit"
+            form="owner-login-form"
+            className="w-full"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Signing in..." : "Log in"}
           </Button>
           <Link
             to="/"

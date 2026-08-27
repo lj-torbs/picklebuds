@@ -30,6 +30,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
+import { AuthApiError, getAuthErrorMessage } from "@/lib/auth-api"
+import { createPrivateBookingWithApi } from "@/lib/booking-api"
 import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
@@ -143,6 +145,7 @@ export function GymDetailPage() {
   const [rentalQuantities, setRentalQuantities] = useState<
     Record<string, number>
   >({})
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false)
 
   const selectedCourt: Court | undefined = useMemo(
     () =>
@@ -390,8 +393,8 @@ export function GymDetailPage() {
     })
   }
 
-  function handleConfirmBooking() {
-    if (!gym || !paymentSetup || !receiptIsComplete) {
+  async function handleConfirmBooking() {
+    if (!gym || !paymentSetup || !receiptIsComplete || isSubmittingBooking) {
       return
     }
 
@@ -463,55 +466,137 @@ export function GymDetailPage() {
         return
       }
 
-      bookingSummary.forEach((selection) => {
-        const createdBooking = addBooking({
-          gymId: gym.id,
-          gym: gym.name,
-          address: gym.address,
-          courtId: selection.court.id,
-          court: selection.court.name,
-          date: selection.date,
-          slots: selection.slots,
-          status: "pending",
-          bookingType:
-            selection.court.bookingMode === "open-play"
-              ? "open_play"
-              : "private",
-          participantCount: 1,
-          rentals: confirmedRentals,
-          paymentReceipt,
-          ownerName: user?.name ?? "Guest Player",
-          ownerEmail: user?.email ?? "guest@example.com",
-        })
+      const includesLiveUnsupportedBooking = bookingSummary.some(
+        (selection) => selection.court.bookingMode === "open-play"
+      )
 
-        addTransaction({
-          id: createdBooking.id,
-          customerName: user?.name ?? "Guest Player",
-          customerEmail: user?.email ?? "guest@example.com",
-          gymId: gym.id,
-          gym: gym.name,
-          courtId: selection.court.id,
-          court: selection.court.name,
-          date: selection.date,
-          slots: selection.slots,
-          bookingType:
-            selection.court.bookingMode === "open-play"
-              ? "open_play"
-              : "private",
-          participantCount: 1,
-          amount:
-            (selection.court.bookingMode === "open-play"
-              ? getOpenPlayPricePerPlayer(selection.court)
-              : selection.court.pricePerHour) *
-              selection.slots.length +
-            confirmedRentalPerSession,
-          rentals: confirmedRentals,
-          paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
-          paymentStatus: "unpaid",
-          status: "pending",
-          paymentReceipt,
+      if (includesLiveUnsupportedBooking) {
+        bookingSummary.forEach((selection) => {
+          const createdBooking = addBooking({
+            gymId: gym.id,
+            gym: gym.name,
+            address: gym.address,
+            courtId: selection.court.id,
+            court: selection.court.name,
+            date: selection.date,
+            slots: selection.slots,
+            status: "pending",
+            bookingType: "open_play",
+            participantCount: 1,
+            rentals: confirmedRentals,
+            paymentReceipt,
+            ownerName: user?.name ?? "Guest Player",
+            ownerEmail: user?.email ?? "guest@example.com",
+          })
+
+          addTransaction({
+            id: createdBooking.id,
+            customerName: user?.name ?? "Guest Player",
+            customerEmail: user?.email ?? "guest@example.com",
+            gymId: gym.id,
+            gym: gym.name,
+            courtId: selection.court.id,
+            court: selection.court.name,
+            date: selection.date,
+            slots: selection.slots,
+            bookingType: "open_play",
+            participantCount: 1,
+            amount:
+              getOpenPlayPricePerPlayer(selection.court) *
+                selection.slots.length +
+              confirmedRentalPerSession,
+            rentals: confirmedRentals,
+            paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
+            paymentStatus: "unpaid",
+            status: "pending",
+            paymentReceipt,
+          })
         })
-      })
+      } else {
+        if (!user?.token) {
+          toast.add({
+            title: "Sign in required",
+            description: "Please sign in again before submitting a live booking.",
+            type: "error",
+          })
+          return
+        }
+
+        setIsSubmittingBooking(true)
+        try {
+          for (const selection of bookingSummary) {
+            const computedAmount =
+              selection.court.pricePerHour * selection.slots.length +
+              confirmedRentalPerSession
+
+            const createdBooking = await createPrivateBookingWithApi({
+              token: user.token,
+              venuePublicId: gym.id,
+              courtPublicId: selection.court.id,
+              bookingDate: selection.date,
+              slotLabels: selection.slots,
+              totalAmount: computedAmount,
+              rentals: confirmedRentals ?? [],
+              paymentReceipt,
+              paymentProvider: paymentSetup.provider,
+              paymentAccountNumber: paymentSetup.accountNumber,
+            })
+
+            addBooking({
+              id: createdBooking.public_id,
+              gymId: gym.id,
+              gym: gym.name,
+              address: gym.address,
+              courtId: selection.court.id,
+              court: selection.court.name,
+              date: selection.date,
+              slots: createdBooking.slot_labels,
+              status: createdBooking.status,
+              bookingType: createdBooking.booking_type,
+              participantCount: createdBooking.participant_count,
+              rentals: confirmedRentals,
+              paymentReceipt,
+              ownerName: user.name,
+              ownerEmail: user.email,
+            })
+
+            addTransaction({
+              id: createdBooking.public_id,
+              customerName: user.name,
+              customerEmail: user.email,
+              gymId: gym.id,
+              gym: gym.name,
+              courtId: selection.court.id,
+              court: selection.court.name,
+              date: selection.date,
+              slots: createdBooking.slot_labels,
+              bookingType: "private",
+              participantCount: createdBooking.participant_count,
+              amount: createdBooking.total_amount,
+              rentals: confirmedRentals,
+              paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
+              paymentStatus: "paid",
+              status: createdBooking.status,
+              paymentReceipt,
+            })
+          }
+        } catch (error) {
+          toast.add({
+            title:
+              error instanceof AuthApiError && error.status === 409
+                ? "Booking conflict"
+                : "Booking failed",
+            description: getAuthErrorMessage(
+              error,
+              "Unable to submit your booking right now."
+            ),
+            type: "error",
+          })
+          return
+        } finally {
+          setIsSubmittingBooking(false)
+        }
+      }
     }
     toast.add({
       title: "Receipt submitted",
@@ -1502,11 +1587,14 @@ export function GymDetailPage() {
                         : totalSelectedSlots === 0) ||
                       gym.status !== "active" ||
                       !paymentSetup ||
-                      !receiptIsComplete
+                      !receiptIsComplete ||
+                      isSubmittingBooking
                     }
                   >
                     <CalendarCheck className="size-4" aria-hidden="true" />
-                    {isWholeGymScope
+                    {isSubmittingBooking
+                      ? "Submitting booking..."
+                      : isWholeGymScope
                       ? "Submit whole gym request"
                       : isOpenPlayCourt
                         ? "Join Open Play"

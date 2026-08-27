@@ -1,9 +1,15 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import { loginWithApi, signupWithApi } from "@/lib/auth-api"
+import { persistStorageItem, readStorageItem } from "@/lib/auth-storage"
+
 type AuthUser = {
+  id?: number
+  publicId?: string
   name: string
   email: string
+  token?: string
   phone?: string
   location?: string
   joinedAt: string
@@ -24,8 +30,8 @@ type ProfileUpdate = Partial<Pick<AuthUser, "name" | "phone" | "location">>
 
 type AuthContextValue = {
   user: AuthUser | null
-  login: (input: LoginInput) => void
-  signup: (input: SignupInput) => void
+  login: (input: LoginInput) => Promise<void>
+  signup: (input: SignupInput) => Promise<void>
   logout: () => void
   updateProfile: (update: ProfileUpdate) => void
 }
@@ -44,44 +50,7 @@ function isAuthUser(value: unknown): value is AuthUser {
 }
 
 function readStoredUser(): AuthUser | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-    return isAuthUser(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-function deriveNameFromEmail(email: string) {
-  const [local] = email.split("@")
-  if (!local) {
-    return "Player"
-  }
-
-  return local
-    .replace(/[._-]+/g, " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0]!.toUpperCase() + part.slice(1))
-    .join(" ")
-}
-
-function mergeWithExisting(next: { name?: string; email: string }): AuthUser {
-  const existing = readStoredUser()
-  const base = existing && existing.email === next.email ? existing : null
-
-  return {
-    name: next.name ?? base?.name ?? deriveNameFromEmail(next.email),
-    email: next.email,
-    phone: base?.phone,
-    location: base?.location,
-    joinedAt: base?.joinedAt ?? new Date().toISOString(),
-  }
+  return readStorageItem(STORAGE_KEY, isAuthUser)
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -89,23 +58,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const persistUser = React.useCallback((nextUser: AuthUser | null) => {
     setUser(nextUser)
-    if (nextUser) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
-    } else {
-      localStorage.removeItem(STORAGE_KEY)
-    }
+    persistStorageItem(STORAGE_KEY, nextUser)
   }, [])
 
   const login = React.useCallback(
-    ({ email }: LoginInput) => {
-      persistUser(mergeWithExisting({ email }))
+    async ({ email, password }: LoginInput) => {
+      const session = await loginWithApi(email, password, "player")
+      const existing = readStoredUser()
+      persistUser({
+        id: session.user.id,
+        publicId: session.user.public_id,
+        name: session.user.full_name,
+        email: session.user.email,
+        token: session.access_token,
+        phone: existing?.email === session.user.email ? existing.phone : undefined,
+        location:
+          existing?.email === session.user.email ? existing.location : undefined,
+        joinedAt:
+          session.user.joined_at ??
+          (existing?.email === session.user.email
+            ? existing.joinedAt
+            : new Date().toISOString()),
+      })
     },
     [persistUser]
   )
 
   const signup = React.useCallback(
-    ({ name, email }: SignupInput) => {
-      persistUser(mergeWithExisting({ name, email }))
+    async ({ name, email, password }: SignupInput) => {
+      const session = await signupWithApi(name, email, password)
+      persistUser({
+        id: session.user.id,
+        publicId: session.user.public_id,
+        name: session.user.full_name,
+        email: session.user.email,
+        token: session.access_token,
+        joinedAt: session.user.joined_at ?? new Date().toISOString(),
+      })
     },
     [persistUser]
   )
@@ -121,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const nextUser = { ...current, ...update }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
+      persistStorageItem(STORAGE_KEY, nextUser)
       return nextUser
     })
   }, [])

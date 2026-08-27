@@ -34,14 +34,16 @@ export function TransactionDetailSheet({
   onComplete,
   onCancel,
   onRefund,
+  isSubmitting = false,
 }: {
   transaction: Transaction | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (id: string) => void
-  onComplete: (id: string) => void
-  onCancel: (id: string) => void
-  onRefund: (id: string) => void
+  onConfirm: (id: string) => void | Promise<void>
+  onComplete: (id: string) => void | Promise<void>
+  onCancel: (id: string) => void | Promise<void>
+  onRefund: (id: string) => void | Promise<void>
+  isSubmitting?: boolean
 }) {
   const canApprove = transaction?.status === "pending" && !!transaction.paymentReceipt
   const canComplete = transaction?.status === "confirmed"
@@ -215,25 +217,25 @@ export function TransactionDetailSheet({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={!canApprove}
+                disabled={!canApprove || isSubmitting}
                 onClick={() => onConfirm(transaction.id)}
               >
-                Approve payment
+                {isSubmitting ? "Saving..." : "Approve payment"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={!canComplete}
+                disabled={!canComplete || isSubmitting}
                 onClick={() => onComplete(transaction.id)}
               >
-                Mark completed
+                {isSubmitting ? "Saving..." : "Mark completed"}
               </Button>
               <Button
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={transaction.status === "cancelled"}
+                disabled={transaction.status === "cancelled" || isSubmitting}
                 onClick={() => onCancel(transaction.id)}
               >
                 Cancel booking
@@ -242,7 +244,7 @@ export function TransactionDetailSheet({
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={transaction.paymentStatus === "refunded"}
+                disabled={transaction.paymentStatus === "refunded" || isSubmitting}
                 onClick={() => onRefund(transaction.id)}
               >
                 Refund payment
