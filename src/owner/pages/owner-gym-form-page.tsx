@@ -197,6 +197,7 @@ export function OwnerGymFormPage() {
   const [showErrors, setShowErrors] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const hydratedGymIdRef = useRef<string | null>(null)
 
   const [details, setDetails] = useState<DetailsDraft>({
     name: editingGym?.name ?? "",
@@ -242,6 +243,54 @@ export function OwnerGymFormPage() {
       description: item.description ?? "",
     }))
   )
+
+  useEffect(() => {
+    if (!editingGym || hydratedGymIdRef.current === editingGym.id) {
+      return
+    }
+
+    setDetails({
+      name: editingGym.name,
+      address: editingGym.address,
+      phone: editingGym.phone ?? "",
+      imageUrl: editingGym.imageUrl ?? "",
+      status: editingGym.status,
+    })
+    setPaymentOptions(
+      editingGym.paymentOptions.length > 0
+        ? editingGym.paymentOptions.map((option) => ({
+            provider: option.provider,
+            accountName: option.accountName,
+            accountNumber: option.accountNumber,
+            instructions: option.instructions ?? "",
+            qrCodeImageUrl: option.qrCodeImageUrl,
+            qrCodeFileName: option.qrCodeFileName,
+          }))
+        : [{ ...emptyPaymentSetupDraft }]
+    )
+    setWholeGym({
+      enabled: editingGym.wholeGymBooking?.enabled ?? false,
+      pricePerHour: editingGym.wholeGymBooking?.pricePerHour
+        ? String(editingGym.wholeGymBooking.pricePerHour)
+        : "",
+      notes: editingGym.wholeGymBooking?.notes ?? "",
+    })
+    setWholeGymTimeRanges(
+      createTimeRangeDrafts(editingGym.wholeGymBooking?.availableSlots ?? [])
+    )
+    setRentalItems(
+      editingGym.rentalItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        pricePerSession: String(item.pricePerSession),
+        quantityAvailable: String(item.quantityAvailable),
+        status: item.status,
+        description: item.description ?? "",
+      }))
+    )
+    hydratedGymIdRef.current = editingGym.id
+  }, [editingGym])
 
   // An owner opening someone else's gym, or a stale /edit link, goes back to the list.
   if (!canEdit) {
@@ -465,7 +514,7 @@ export function OwnerGymFormPage() {
         className="grid min-w-0 gap-6 rounded-lg border bg-card p-4 sm:p-6"
         onSubmit={(event) => {
           event.preventDefault()
-          if (isLastStep) {
+          if (isEditing || isLastStep) {
             handleSubmit()
           } else {
             goToStep(stepIndex + 1)
@@ -959,15 +1008,21 @@ export function OwnerGymFormPage() {
                 Back
               </Button>
             ) : null}
-            {isLastStep ? (
+            {isEditing ? (
               <Button type="submit">
-                {editingGym ? "Save changes" : "Add gym"}
+                Save changes
               </Button>
             ) : (
-              <Button type="submit">
-                Next: {steps[stepIndex + 1].shortTitle}
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Button>
+              <>
+                {isLastStep ? (
+                  <Button type="submit">Add gym</Button>
+                ) : (
+                  <Button type="submit">
+                    Next: {steps[stepIndex + 1].shortTitle}
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>

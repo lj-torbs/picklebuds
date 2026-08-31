@@ -148,6 +148,22 @@ export type VenueDetailApiResponse = {
   courts: VenueCourtApiResponse[]
 }
 
+export type VenueListItemApiResponse = {
+  public_id: string
+  name: string
+  address: string
+  phone: string | null
+  status: "active" | "inactive"
+  image_url: string | null
+  court_count: number
+  has_open_play: boolean
+  whole_gym_enabled: boolean
+}
+
+export type VenueListApiResponse = {
+  items: VenueListItemApiResponse[]
+}
+
 export type VenueAvailabilityItemApiResponse = {
   date: string
   slot_label: string
@@ -351,6 +367,29 @@ export function refundOwnerBookingWithApi(
   bookingPublicId: string
 ) {
   return postOwnerBookingAction(token, bookingPublicId, "refund")
+}
+
+export async function getVenuesWithApi() {
+  const response = await fetch(`${API_BASE_URL}/venues`)
+
+  let payload: VenueListApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to load venues right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return (payload as VenueListApiResponse).items
 }
 
 export async function getVenueDetailWithApi(venuePublicId: string) {

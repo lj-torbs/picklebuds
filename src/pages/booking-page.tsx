@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import {
   ArrowRight,
@@ -19,6 +19,11 @@ import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
 import { OpenPlayPanel } from "@/shared/components/player/open-play-panel"
 import { PasaloPanel } from "@/shared/components/player/pasalo-panel"
 import { PlayerModeStrip } from "@/shared/components/player/player-mode-strip"
+import {
+  getVenueDetailWithApi,
+  getVenuesWithApi,
+  type VenueDetailApiResponse,
+} from "@/lib/booking-api"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 
@@ -130,14 +135,66 @@ function gymMatchesPrice(gym: Gym, filter: PriceFilter) {
   )
 }
 
+function mapVenueDetailToGym(venue: VenueDetailApiResponse): Gym {
+  return {
+    id: venue.public_id,
+    ownerId: venue.owner_public_id,
+    name: venue.name,
+    address: venue.address,
+    phone: venue.phone ?? "",
+    status: venue.status,
+    imageUrl: venue.image_url ?? undefined,
+    paymentOptions: venue.payment_methods.map((method) => ({
+      provider: method.provider,
+      accountName: method.account_name,
+      accountNumber: method.account_number,
+      instructions: method.instructions ?? undefined,
+      qrCodeImageUrl: method.qr_code_image_url,
+      qrCodeFileName: method.qr_code_file_name,
+    })),
+    wholeGymBooking:
+      venue.whole_gym_booking && venue.whole_gym_booking.enabled
+        ? {
+            enabled: true,
+            pricePerHour: venue.whole_gym_booking.price_per_hour ?? 0,
+            availableSlots: venue.whole_gym_booking.available_slots,
+            notes: venue.whole_gym_booking.notes ?? undefined,
+          }
+        : undefined,
+    rentalItems: venue.rental_items.map((item) => ({
+      id: item.public_id,
+      name: item.name,
+      category: item.category,
+      pricePerSession: item.price_per_session,
+      quantityAvailable: item.quantity_available,
+      status: item.status,
+      description: item.description ?? undefined,
+    })),
+    courts: venue.courts.map((court) => ({
+      id: court.public_id,
+      name: court.name,
+      surface: court.surface,
+      capacity: court.capacity_label,
+      pricePerHour: court.price_per_hour,
+      status: court.status,
+      bookingMode: court.booking_mode === "open_play" ? "open-play" : "private",
+      openPlayCapacity: court.open_play_capacity ?? undefined,
+      availableSlots: court.available_slots,
+      imageUrl: court.image_url ?? undefined,
+    })),
+  }
+}
+
 export function BookingPage() {
-  const { gyms } = useGyms()
+  const { gyms: fallbackGyms } = useGyms()
   const [searchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [locationFilter, setLocationFilter] = useState("all")
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all")
   const [availabilityFilter, setAvailabilityFilter] =
     useState<AvailabilityFilter>("all")
+  const [gyms, setGyms] = useState<Gym[]>(fallbackGyms)
+  const [isLoadingGyms, setIsLoadingGyms] = useState(true)
 
   const mode = (() => {
     const value = searchParams.get("mode")
@@ -148,6 +205,43 @@ export function BookingPage() {
 
     return "booking"
   })() as BookingWorkspaceMode
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadGyms() {
+      setIsLoadingGyms(true)
+
+      try {
+        const venues = await getVenuesWithApi()
+        const venueDetails = await Promise.all(
+          venues.map((venue) => getVenueDetailWithApi(venue.public_id))
+        )
+
+        if (!isMounted) {
+          return
+        }
+
+        setGyms(venueDetails.map(mapVenueDetailToGym))
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setGyms(fallbackGyms)
+      } finally {
+        if (isMounted) {
+          setIsLoadingGyms(false)
+        }
+      }
+    }
+
+    void loadGyms()
+
+    return () => {
+      isMounted = false
+    }
+  }, [fallbackGyms])
 
   const locations = useMemo(
     () => Array.from(new Set(gyms.map((gym) => getGymLocation(gym)))).sort(),
@@ -300,7 +394,14 @@ export function BookingPage() {
               </span>
             </div>
 
-            {filteredGyms.length === 0 ? (
+            {isLoadingGyms ? (
+              <div className="mt-4 rounded-lg border bg-background p-8 text-center shadow-xs">
+                <p className="font-medium">Loading venues</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Syncing the latest courts from gym owners.
+                </p>
+              </div>
+            ) : filteredGyms.length === 0 ? (
               <div className="mt-4 rounded-lg border bg-background p-8 text-center shadow-xs">
                 <p className="font-medium">No venues match your filters</p>
                 <p className="mt-1 text-sm text-muted-foreground">
