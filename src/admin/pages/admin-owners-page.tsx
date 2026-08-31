@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Search } from "lucide-react"
 
 import { OwnerDetailSheet } from "@/admin/components/owners/owner-detail-sheet"
 import { OwnerStatusBadge } from "@/admin/components/owners/owner-status-badge"
 import type {
+  OwnerDetailRecord,
   OwnerRecord,
   SystemPaymentStatus,
 } from "@/admin/lib/admin-owners-context"
@@ -13,10 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
-import { useGyms } from "@/shared/lib/gyms-context"
-import { useTransactions } from "@/shared/lib/transactions-context"
-
-const SYSTEM_SHARE_RATE = 0.12
+import { useAdminAuth } from "@/admin/lib/admin-auth-context"
 const quickFilters = ["all", "paid", "unpaid", "suspended"] as const
 type QuickFilter = (typeof quickFilters)[number]
 
@@ -57,13 +55,24 @@ function PaymentStatusBadge({
 }
 
 export function AdminOwnersPage() {
-  const { owners, setOwnerStatus, setSystemPaymentStatus } = useAdminOwners()
-  const { gyms } = useGyms()
-  const { transactions } = useTransactions()
+  const {
+    owners,
+    isLoading,
+    error,
+    refreshOwners,
+    getOwnerDetail,
+    setOwnerStatus,
+    setSystemPaymentStatus,
+    lockOwnerUntilPaid,
+    unlockOwner,
+  } = useAdminOwners()
+  const { admin } = useAdminAuth()
   const toast = useToast()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null)
+  const [selectedOwnerDetail, setSelectedOwnerDetail] =
+    useState<OwnerDetailRecord | null>(null)
   const [systemPaymentFilter, setSystemPaymentFilter] = useState<
     SystemPaymentStatus | "all"
   >("all")
@@ -71,66 +80,44 @@ export function AdminOwnersPage() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
 
-  const ownerStats = useMemo(() => {
-    const stats = new Map<
-      string,
-      {
-        totalGyms: number
-        totalCourts: number
-        grossRevenue: number
-        systemShare: number
-        ownerProfit: number
-      }
-    >()
+  useEffect(() => {
+    if (!admin?.token) {
+      return
+    }
+    void refreshOwners({ dateFrom, dateTo })
+  }, [admin?.token, dateFrom, dateTo, refreshOwners])
 
-    for (const owner of owners) {
-      stats.set(owner.id, {
-        totalGyms: 0,
-        totalCourts: 0,
-        grossRevenue: 0,
-        systemShare: 0,
-        ownerProfit: 0,
+  useEffect(() => {
+    if (!selectedOwnerId || !admin?.token) {
+      return
+    }
+
+    let isActive = true
+    void getOwnerDetail(selectedOwnerId, { dateFrom, dateTo })
+      .then((detail) => {
+        if (isActive) {
+          setSelectedOwnerDetail(detail)
+        }
       })
+      .catch((nextError) => {
+        if (!isActive) {
+          return
+        }
+        setSelectedOwnerDetail(null)
+        toast.add({
+          title: "Unable to load owner details",
+          description:
+            nextError instanceof Error
+              ? nextError.message
+              : "Please try again.",
+          type: "error",
+        })
+      })
+
+    return () => {
+      isActive = false
     }
-
-    for (const gym of gyms) {
-      const current = stats.get(gym.ownerId)
-      if (!current) {
-        continue
-      }
-      current.totalGyms += 1
-      current.totalCourts += gym.courts.length
-    }
-
-    for (const transaction of transactions) {
-      if (
-        transaction.paymentStatus !== "paid" ||
-        (dateFrom.length > 0 && transaction.date < dateFrom) ||
-        (dateTo.length > 0 && transaction.date > dateTo)
-      ) {
-        continue
-      }
-
-      const gym = gyms.find((currentGym) => currentGym.id === transaction.gymId)
-      if (!gym) {
-        continue
-      }
-
-      const current = stats.get(gym.ownerId)
-      if (!current) {
-        continue
-      }
-
-      current.grossRevenue += transaction.amount
-    }
-
-    for (const current of stats.values()) {
-      current.systemShare = current.grossRevenue * SYSTEM_SHARE_RATE
-      current.ownerProfit = current.grossRevenue - current.systemShare
-    }
-
-    return stats
-  }, [owners, gyms, transactions, dateFrom, dateTo])
+  }, [admin?.token, dateFrom, dateTo, getOwnerDetail, selectedOwnerId, toast])
 
   const filteredOwners = useMemo(
     () =>
@@ -148,63 +135,124 @@ export function AdminOwnersPage() {
     [owners, searchQuery, systemPaymentFilter, quickFilter]
   )
 
-  const selectedOwner =
-    owners.find((owner) => owner.id === selectedOwnerId) ?? null
+  const selectedOwner = owners.find((owner) => owner.id === selectedOwnerId) ?? null
 
-  const selectedOwnerTransactions = selectedOwner
-    ? transactions.filter((transaction) => {
-        const gym = gyms.find((currentGym) => currentGym.id === transaction.gymId)
-
-        return (
-          gym?.ownerId === selectedOwner.id &&
-          (dateFrom.length === 0 || transaction.date >= dateFrom) &&
-          (dateTo.length === 0 || transaction.date <= dateTo)
-        )
-      })
-    : []
-
-  function handleToggleStatus(id: string) {
+  async function handleToggleStatus(id: string) {
     const owner = owners.find((current) => current.id === id)
     if (!owner) {
       return
     }
 
     const nextStatus = owner.status === "active" ? "suspended" : "active"
-    setOwnerStatus(id, nextStatus, nextStatus === "suspended" ? "manual_review" : undefined)
-    toast.add({
-      title: nextStatus === "suspended" ? "Owner suspended" : "Owner reactivated",
-      description: `${owner.name} is now ${nextStatus}.`,
-      type: "success",
-    })
+    try {
+      await setOwnerStatus(
+        id,
+        nextStatus,
+        nextStatus === "suspended" ? "manual_review" : undefined
+      )
+      toast.add({
+        title: nextStatus === "suspended" ? "Owner suspended" : "Owner reactivated",
+        description: `${owner.name} is now ${nextStatus}.`,
+        type: "success",
+      })
+      if (selectedOwnerId === id) {
+        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
+        setSelectedOwnerDetail(detail)
+      }
+    } catch (error) {
+      toast.add({
+        title: "Unable to update owner",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    }
   }
 
-  function handleSystemPaymentStatus(id: string, status: SystemPaymentStatus) {
+  async function handleSystemPaymentStatus(
+    id: string,
+    status: SystemPaymentStatus
+  ) {
     const owner = owners.find((current) => current.id === id)
     if (!owner) {
       return
     }
 
-    setSystemPaymentStatus(id, status)
-    toast.add({
-      title:
-        status === "paid" ? "System share marked paid" : "System share marked unpaid",
-      description: `${owner.name} is now ${status} for admin settlement.`,
-      type: "success",
-    })
+    try {
+      await setSystemPaymentStatus(id, status)
+      toast.add({
+        title:
+          status === "paid" ? "System share marked paid" : "System share marked unpaid",
+        description: `${owner.name} is now ${status} for admin settlement.`,
+        type: "success",
+      })
+      await refreshOwners({ dateFrom, dateTo })
+      if (selectedOwnerId === id) {
+        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
+        setSelectedOwnerDetail(detail)
+      }
+    } catch (error) {
+      toast.add({
+        title: "Unable to update settlement",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    }
   }
 
-  function handleLockUntilPaid(id: string) {
+  async function handleLockUntilPaid(id: string) {
     const owner = owners.find((current) => current.id === id)
     if (!owner) {
       return
     }
 
-    setOwnerStatus(id, "suspended", "system_payment_due")
-    toast.add({
-      title: "Owner locked",
-      description: `${owner.name} must pay the system share first before access is restored.`,
-      type: "success",
-    })
+    try {
+      await lockOwnerUntilPaid(id)
+      toast.add({
+        title: "Owner locked",
+        description: `${owner.name} must pay the system share first before access is restored.`,
+        type: "success",
+      })
+      if (selectedOwnerId === id) {
+        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
+        setSelectedOwnerDetail(detail)
+      }
+    } catch (error) {
+      toast.add({
+        title: "Unable to lock owner",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    }
+  }
+
+  async function handleUnlock(id: string) {
+    const owner = owners.find((current) => current.id === id)
+    if (!owner) {
+      return
+    }
+
+    try {
+      await unlockOwner(id)
+      toast.add({
+        title: "Owner access restored",
+        description: `${owner.name} can access the owner panel again.`,
+        type: "success",
+      })
+      if (selectedOwnerId === id) {
+        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
+        setSelectedOwnerDetail(detail)
+      }
+    } catch (error) {
+      toast.add({
+        title: "Unable to unlock owner",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    }
   }
 
   return (
@@ -284,7 +332,15 @@ export function AdminOwnersPage() {
         </div>
       </div>
 
-      {filteredOwners.length === 0 ? (
+      {isLoading ? (
+        <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
+          Loading owners...
+        </p>
+      ) : error ? (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+          {error}
+        </p>
+      ) : filteredOwners.length === 0 ? (
         <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
           No owners match your filters.
         </p>
@@ -308,14 +364,6 @@ export function AdminOwnersPage() {
             </thead>
             <tbody className="divide-y">
               {filteredOwners.map((owner) => {
-                const stats = ownerStats.get(owner.id) ?? {
-                  totalGyms: 0,
-                  totalCourts: 0,
-                  grossRevenue: 0,
-                  systemShare: 0,
-                  ownerProfit: 0,
-                }
-
                 return (
                   <tr key={owner.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3">
@@ -325,15 +373,15 @@ export function AdminOwnersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {owner.joinedAt}
+                      {owner.joinedAt ? owner.joinedAt.slice(0, 10) : "--"}
                     </td>
-                    <td className="px-4 py-3">{stats.totalGyms}</td>
-                    <td className="px-4 py-3">{stats.totalCourts}</td>
+                    <td className="px-4 py-3">{owner.totalGyms}</td>
+                    <td className="px-4 py-3">{owner.totalCourts}</td>
                     <td className="px-4 py-3 font-medium">
-                      {formatCurrency(stats.ownerProfit)}
+                      {formatCurrency(owner.ownerProfit)}
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      {formatCurrency(stats.systemShare)}
+                      {formatCurrency(owner.systemShare)}
                     </td>
                     <td className="px-4 py-3">
                       <PaymentStatusBadge status={owner.systemPaymentStatus} />
@@ -399,27 +447,37 @@ export function AdminOwnersPage() {
       )}
 
       <OwnerDetailSheet
-        owner={selectedOwner}
-        transactions={selectedOwnerTransactions}
+        owner={selectedOwnerDetail?.owner ?? selectedOwner}
+        transactions={selectedOwnerDetail?.transactions ?? []}
         open={selectedOwner !== null}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedOwnerId(null)
+            setSelectedOwnerDetail(null)
           }
         }}
         onToggleStatus={handleToggleStatus}
         onSetSystemPaymentStatus={handleSystemPaymentStatus}
         onLockUntilPaid={handleLockUntilPaid}
+        onUnlock={handleUnlock}
         settlementSummary={
-          selectedOwner
-            ? ownerStats.get(selectedOwner.id) ?? {
-                totalGyms: 0,
-                totalCourts: 0,
-                grossRevenue: 0,
-                systemShare: 0,
-                ownerProfit: 0,
+          selectedOwnerDetail
+            ? {
+                totalGyms: selectedOwnerDetail.owner.totalGyms,
+                totalCourts: selectedOwnerDetail.owner.totalCourts,
+                grossRevenue: selectedOwnerDetail.owner.grossRevenue,
+                systemShare: selectedOwnerDetail.owner.systemShare,
+                ownerProfit: selectedOwnerDetail.owner.ownerProfit,
               }
-            : null
+            : selectedOwner
+              ? {
+                  totalGyms: selectedOwner.totalGyms,
+                  totalCourts: selectedOwner.totalCourts,
+                  grossRevenue: selectedOwner.grossRevenue,
+                  systemShare: selectedOwner.systemShare,
+                  ownerProfit: selectedOwner.ownerProfit,
+                }
+              : null
         }
       />
     </div>

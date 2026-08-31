@@ -35,13 +35,13 @@ export function GymCard({
   onRemoveCourt,
 }: {
   gym: Gym
-  onEditGym: (gym: Gym) => void
-  onToggleGymStatus: (gym: Gym) => void
+  onEditGym?: (gym: Gym) => void
+  onToggleGymStatus?: (gym: Gym) => void
   onRemoveGym?: (gym: Gym) => void
-  onAddCourt: (gymId: string) => void
-  onEditCourt: (gymId: string, court: Court) => void
-  onToggleCourtStatus: (gymId: string, court: Court) => void
-  onRemoveCourt: (gymId: string, court: Court) => void
+  onAddCourt?: (gymId: string) => void
+  onEditCourt?: (gymId: string, court: Court) => void
+  onToggleCourtStatus?: (gymId: string, court: Court) => void
+  onRemoveCourt?: (gymId: string, court: Court) => void
 }) {
   const [confirmingRemoveGym, setConfirmingRemoveGym] = useState(false)
   const [confirmingRemoveCourtId, setConfirmingRemoveCourtId] = useState<
@@ -80,23 +80,27 @@ export function GymCard({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onEditGym(gym)}
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-            Edit
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onToggleGymStatus(gym)}
-          >
-            {gym.status === "active" ? "Deactivate" : "Activate"}
-          </Button>
+          {onEditGym ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onEditGym(gym)}
+            >
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit
+            </Button>
+          ) : null}
+          {onToggleGymStatus ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onToggleGymStatus(gym)}
+            >
+              {gym.status === "active" ? "Deactivate" : "Activate"}
+            </Button>
+          ) : null}
           {onRemoveGym ? (
             confirmingRemoveGym ? (
               <>
@@ -140,15 +144,17 @@ export function GymCard({
           <span className="text-sm font-medium text-muted-foreground">
             Courts ({gym.courts.length})
           </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onAddCourt(gym.id)}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            Add court
-          </Button>
+          {onAddCourt ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onAddCourt(gym.id)}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Add court
+            </Button>
+          ) : null}
         </div>
 
         <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
@@ -298,26 +304,30 @@ export function GymCard({
                 </div>
 
                 <div className="flex shrink-0 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onToggleCourtStatus(gym.id, court)}
-                  >
-                    {court.status === "available"
-                      ? "Mark maintenance"
-                      : "Mark available"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Edit ${court.name}`}
-                    onClick={() => onEditCourt(gym.id, court)}
-                  >
-                    <Pencil className="size-4" aria-hidden="true" />
-                  </Button>
-                  {confirmingRemoveCourtId === court.id ? (
+                  {onToggleCourtStatus ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onToggleCourtStatus(gym.id, court)}
+                    >
+                      {court.status === "available"
+                        ? "Mark maintenance"
+                        : "Mark available"}
+                    </Button>
+                  ) : null}
+                  {onEditCourt ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Edit ${court.name}`}
+                      onClick={() => onEditCourt(gym.id, court)}
+                    >
+                      <Pencil className="size-4" aria-hidden="true" />
+                    </Button>
+                  ) : null}
+                  {onRemoveCourt && confirmingRemoveCourtId === court.id ? (
                     <>
                       <Button
                         type="button"
@@ -339,7 +349,7 @@ export function GymCard({
                         Cancel
                       </Button>
                     </>
-                  ) : (
+                  ) : onRemoveCourt ? (
                     <Button
                       type="button"
                       variant="ghost"
@@ -349,7 +359,7 @@ export function GymCard({
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}

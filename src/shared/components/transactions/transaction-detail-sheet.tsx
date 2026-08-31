@@ -47,6 +47,8 @@ export function TransactionDetailSheet({
 }) {
   const canApprove = transaction?.status === "pending" && !!transaction.paymentReceipt
   const canComplete = transaction?.status === "confirmed"
+  const destructiveActionLabel =
+    transaction?.status === "pending" ? "Reject payment" : "Cancel booking"
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -238,7 +240,7 @@ export function TransactionDetailSheet({
                 disabled={transaction.status === "cancelled" || isSubmitting}
                 onClick={() => onCancel(transaction.id)}
               >
-                Cancel booking
+                {isSubmitting ? "Saving..." : destructiveActionLabel}
               </Button>
               <Button
                 type="button"

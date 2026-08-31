@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils"
 
 const statusStyles: Record<OwnerStatus, string> = {
   active: "bg-primary/15 text-primary",
+  inactive: "bg-muted text-muted-foreground",
   suspended: "bg-destructive/10 text-destructive",
 }
 

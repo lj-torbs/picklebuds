@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowLeft,
@@ -31,7 +31,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
 import { AuthApiError, getAuthErrorMessage } from "@/lib/auth-api"
-import { createPrivateBookingWithApi } from "@/lib/booking-api"
+import {
+  createPrivateBookingWithApi,
+  getVenueAvailabilityWithApi,
+  getVenueDetailWithApi,
+  type VenueAvailabilityApiResponse,
+  type VenueDetailApiResponse,
+} from "@/lib/booking-api"
 import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
 import { cn } from "@/lib/utils"
@@ -47,6 +53,7 @@ import {
 } from "@/shared/components/gyms/gym-status-badge"
 import type {
   BookingRental,
+  Gym,
   Court,
   RentalItem,
 } from "@/shared/lib/gyms-context"
@@ -97,6 +104,57 @@ function getOpenPlayPricePerPlayer(court: Court) {
   return court.pricePerHour / court.openPlayCapacity
 }
 
+function mapVenueDetailToGym(venue: VenueDetailApiResponse): Gym {
+  return {
+    id: venue.public_id,
+    ownerId: venue.owner_public_id,
+    name: venue.name,
+    address: venue.address,
+    phone: venue.phone ?? "",
+    status: venue.status,
+    imageUrl: venue.image_url ?? undefined,
+    paymentOptions: venue.payment_methods
+      .filter((method) => method.is_active)
+      .map((method) => ({
+        provider: method.provider,
+        accountName: method.account_name,
+        accountNumber: method.account_number,
+        instructions: method.instructions ?? undefined,
+        qrCodeImageUrl: method.qr_code_image_url,
+        qrCodeFileName: method.qr_code_file_name,
+      })),
+    wholeGymBooking: venue.whole_gym_booking
+      ? {
+          enabled: venue.whole_gym_booking.enabled,
+          pricePerHour: venue.whole_gym_booking.price_per_hour ?? 0,
+          availableSlots: venue.whole_gym_booking.available_slots,
+          notes: venue.whole_gym_booking.notes ?? undefined,
+        }
+      : undefined,
+    rentalItems: venue.rental_items.map((item) => ({
+      id: item.public_id,
+      name: item.name,
+      category: item.category,
+      pricePerSession: item.price_per_session,
+      quantityAvailable: item.quantity_available,
+      status: item.status,
+      description: item.description ?? undefined,
+    })),
+    courts: venue.courts.map((court) => ({
+      id: court.public_id,
+      name: court.name,
+      surface: court.surface,
+      capacity: court.capacity_label,
+      pricePerHour: court.price_per_hour,
+      status: court.status,
+      bookingMode: court.booking_mode === "open_play" ? "open-play" : "private",
+      openPlayCapacity: court.open_play_capacity ?? undefined,
+      availableSlots: court.available_slots,
+      imageUrl: court.image_url ?? undefined,
+    })),
+  }
+}
+
 export function GymDetailPage() {
   const { gymId } = useParams<{ gymId: string }>()
   const [searchParams] = useSearchParams()
@@ -104,25 +162,29 @@ export function GymDetailPage() {
   const { gyms } = useGyms()
   const {
     addBooking,
-    getOpenPlaySeatsTaken,
     getRentedQuantity,
-    isWholeGymBooked,
-    isGymFullyBooked,
-    isSlotBooked,
   } = useBookings()
   const { addTransaction } = useTransactions()
   const { user } = useAuth()
   const toast = useToast()
 
-  const gym = useMemo(
+  const fallbackGym = useMemo(
     () => gyms.find((candidate) => candidate.id === gymId),
     [gyms, gymId]
   )
+  const [remoteGym, setRemoteGym] = useState<Gym | null>(null)
+  const [remoteAvailability, setRemoteAvailability] =
+    useState<VenueAvailabilityApiResponse | null>(null)
+  const [isLoadingVenue, setIsLoadingVenue] = useState(true)
+  const [liveVenueError, setLiveVenueError] = useState<string | null>(null)
 
   const week = useMemo(() => buildWeek(), [])
+  const weekStart = week[0]?.value ?? new Date().toISOString().slice(0, 10)
+
+  const gym = remoteGym ?? fallbackGym
 
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(
-    () => searchParams.get("court") ?? gym?.courts[0]?.id
+    () => searchParams.get("court") ?? undefined
   )
   const [selectedBookingScope, setSelectedBookingScope] =
     useState<BookingScope>(() =>
@@ -147,11 +209,58 @@ export function GymDetailPage() {
   >({})
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false)
 
+  useEffect(() => {
+    if (!gymId) {
+      return
+    }
+    let isActive = true
+
+    void Promise.all([
+      getVenueDetailWithApi(gymId),
+      getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW),
+    ])
+      .then(([venueDetail, venueAvailability]) => {
+        if (!isActive) {
+          return
+        }
+        setRemoteGym(mapVenueDetailToGym(venueDetail))
+        setRemoteAvailability(venueAvailability)
+        setLiveVenueError(null)
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return
+        }
+        setRemoteGym(null)
+        setRemoteAvailability(null)
+        setLiveVenueError(
+          getAuthErrorMessage(
+            error,
+            "Unable to load live venue details. Showing sample data instead."
+          )
+        )
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingVenue(false)
+        }
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [gymId, weekStart])
+
+  const resolvedSelectedCourtId =
+    selectedCourtId && gym?.courts.some((court) => court.id === selectedCourtId)
+      ? selectedCourtId
+      : gym?.courts[0]?.id
+
   const selectedCourt: Court | undefined = useMemo(
     () =>
-      gym?.courts.find((court) => court.id === selectedCourtId) ??
+      gym?.courts.find((court) => court.id === resolvedSelectedCourtId) ??
       gym?.courts[0],
-    [gym, selectedCourtId]
+    [gym, resolvedSelectedCourtId]
   )
 
   const bookingSummary = useMemo(
@@ -172,7 +281,8 @@ export function GymDetailPage() {
   )
   const isOpenPlayCourt = selectedCourt?.bookingMode === "open-play"
   const paymentOptions = gym?.paymentOptions ?? []
-  const paymentSetup = paymentOptions[selectedPaymentOptionIndex]
+  const paymentSetup =
+    paymentOptions[selectedPaymentOptionIndex] ?? paymentOptions[0]
   const wholeGymSetup = gym?.wholeGymBooking
   const wholeGymBookingEnabled =
     wholeGymSetup?.enabled === true &&
@@ -207,6 +317,33 @@ export function GymDetailPage() {
   const wholeGymParticipantCount = Number(wholeGymParticipants)
   const wholeGymParticipantCountValid =
     Number.isFinite(wholeGymParticipantCount) && wholeGymParticipantCount > 0
+  const selectedCourtAvailability = useMemo(
+    () =>
+      remoteAvailability?.courts.find(
+        (court) => court.court_public_id === selectedCourt?.id
+      ) ?? null,
+    [remoteAvailability, selectedCourt?.id]
+  )
+  const selectedCourtAvailabilityMap = useMemo(
+    () =>
+      new Map(
+        (selectedCourtAvailability?.items ?? []).map((item) => [
+          `${item.date}|${item.slot_label}`,
+          item,
+        ])
+      ),
+    [selectedCourtAvailability]
+  )
+  const wholeGymAvailabilityMap = useMemo(
+    () =>
+      new Map(
+        (remoteAvailability?.whole_gym?.items ?? []).map((item) => [
+          `${item.date}|${item.slot_label}`,
+          item,
+        ])
+      ),
+    [remoteAvailability]
+  )
 
   function handleReceiptUpload(file: File | undefined) {
     if (!file) {
@@ -247,10 +384,6 @@ export function GymDetailPage() {
       return "closed"
     }
 
-    if (isWholeGymBooked(gym!.id, day, time)) {
-      return "booked"
-    }
-
     if (
       bookingSelections.some(
         (selection) =>
@@ -262,19 +395,9 @@ export function GymDetailPage() {
       return "selected"
     }
 
-    if (selectedCourt.bookingMode === "open-play") {
-      const seatsTaken = getOpenPlaySeatsTaken(
-        gym!.id,
-        selectedCourt.id,
-        day,
-        time
-      )
-      const seatsLeft = (selectedCourt.openPlayCapacity ?? 0) - seatsTaken
-      return seatsLeft <= 0 ? "booked" : "available"
-    }
-
-    if (isSlotBooked(gym!.id, selectedCourt.id, day, time)) {
-      return "booked"
+    const liveItem = selectedCourtAvailabilityMap.get(`${day}|${time}`)
+    if (liveItem) {
+      return liveItem.state
     }
 
     return "available"
@@ -296,8 +419,9 @@ export function GymDetailPage() {
       return "selected"
     }
 
-    if (isGymFullyBooked(gym!.id, day, time)) {
-      return "booked"
+    const liveItem = wholeGymAvailabilityMap.get(`${day}|${time}`)
+    if (liveItem) {
+      return liveItem.state
     }
 
     return "available"
@@ -312,16 +436,13 @@ export function GymDetailPage() {
       return undefined
     }
 
-    const openPlayCapacity = selectedCourt.openPlayCapacity ?? 0
-    const seatsTaken = getOpenPlaySeatsTaken(
-      gym!.id,
-      selectedCourt.id,
-      day,
-      time
-    )
+    const liveItem = selectedCourtAvailabilityMap.get(`${day}|${time}`)
+    const openPlayCapacity =
+      liveItem?.seats_capacity ?? selectedCourt.openPlayCapacity ?? 0
+    const seatsTaken = liveItem?.seats_taken ?? 0
 
     if (state === "closed") {
-      return "—"
+      return "-"
     }
 
     if (state === "selected") {
@@ -421,181 +542,204 @@ export function GymDetailPage() {
         return
       }
 
-      wholeGymSelections.forEach((selection) => {
-        const createdBooking = addBooking({
-          gymId: gym.id,
-          gym: gym.name,
-          address: gym.address,
-          courtId: "whole-gym",
-          court: "Whole gym",
-          date: selection.date,
-          slots: selection.slots,
-          status: "pending",
-          bookingType: "whole_gym",
-          participantCount: wholeGymParticipantCount,
-          rentals: confirmedRentals,
-          paymentReceipt,
-          ownerName: user?.name ?? "Guest Player",
-          ownerEmail: user?.email ?? "guest@example.com",
+      if (!user?.token) {
+        toast.add({
+          title: "Sign in required",
+          description: "Please sign in again before submitting a live booking.",
+          type: "error",
         })
+        return
+      }
 
-        addTransaction({
-          id: createdBooking.id,
-          customerName: user?.name ?? "Guest Player",
-          customerEmail: user?.email ?? "guest@example.com",
-          gymId: gym.id,
-          gym: gym.name,
-          courtId: "whole-gym",
-          court: "Whole gym",
-          date: selection.date,
-          slots: selection.slots,
-          bookingType: "whole_gym",
-          participantCount: wholeGymParticipantCount,
-          amount:
+      setIsSubmittingBooking(true)
+      try {
+        for (const selection of wholeGymSelections) {
+          const computedAmount =
             wholeGymSetup.pricePerHour * selection.slots.length +
-            confirmedRentalPerSession,
-          rentals: confirmedRentals,
-          paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
-          paymentStatus: "unpaid",
-          status: "pending",
-          paymentReceipt,
+            confirmedRentalPerSession
+
+          const createdBooking = await createPrivateBookingWithApi({
+            token: user.token,
+            venuePublicId: gym.id,
+            courtPublicId: null,
+            bookingType: "whole_gym",
+            bookingDate: selection.date,
+            slotLabels: selection.slots,
+            participantCount: wholeGymParticipantCount,
+            totalAmount: computedAmount,
+            rentals: confirmedRentals ?? [],
+            paymentReceipt,
+            paymentProvider: paymentSetup.provider,
+            paymentAccountNumber: paymentSetup.accountNumber,
+          })
+
+          addBooking({
+            id: createdBooking.public_id,
+            gymId: gym.id,
+            gym: gym.name,
+            address: gym.address,
+            courtId: "whole-gym",
+            court: "Whole gym",
+            date: selection.date,
+            slots: createdBooking.slot_labels,
+            status: createdBooking.status,
+            bookingType: createdBooking.booking_type,
+            participantCount: createdBooking.participant_count,
+            rentals: confirmedRentals,
+            paymentReceipt,
+            ownerName: user.name,
+            ownerEmail: user.email,
+          })
+
+          addTransaction({
+            id: createdBooking.public_id,
+            customerName: user.name,
+            customerEmail: user.email,
+            gymId: gym.id,
+            gym: gym.name,
+            courtId: "whole-gym",
+            court: "Whole gym",
+            date: selection.date,
+            slots: createdBooking.slot_labels,
+            bookingType: "whole_gym",
+            participantCount: createdBooking.participant_count,
+            amount: createdBooking.total_amount,
+            rentals: confirmedRentals,
+            paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
+            paymentStatus: "paid",
+            status: createdBooking.status,
+            paymentReceipt,
+          })
+        }
+      } catch (error) {
+        if (gymId) {
+          void getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
+            .then((availability) => {
+              setRemoteAvailability(availability)
+            })
+            .catch(() => {
+              // Keep the last availability snapshot if the refresh fails.
+            })
+        }
+        toast.add({
+          title:
+            error instanceof AuthApiError && error.status === 409
+              ? "Booking conflict"
+              : "Booking failed",
+          description: getAuthErrorMessage(
+            error,
+            "Unable to submit your booking right now."
+          ),
+          type: "error",
         })
-      })
+        return
+      } finally {
+        setIsSubmittingBooking(false)
+      }
     } else {
       if (bookingSummary.length === 0) {
         return
       }
 
-      const includesLiveUnsupportedBooking = bookingSummary.some(
-        (selection) => selection.court.bookingMode === "open-play"
-      )
+      if (!user?.token) {
+        toast.add({
+          title: "Sign in required",
+          description: "Please sign in again before submitting a live booking.",
+          type: "error",
+        })
+        return
+      }
 
-      if (includesLiveUnsupportedBooking) {
-        bookingSummary.forEach((selection) => {
-          const createdBooking = addBooking({
+      setIsSubmittingBooking(true)
+      try {
+        for (const selection of bookingSummary) {
+          const computedAmount =
+            (selection.court.bookingMode === "open-play"
+              ? getOpenPlayPricePerPlayer(selection.court)
+              : selection.court.pricePerHour) *
+              selection.slots.length +
+            confirmedRentalPerSession
+
+          const createdBooking = await createPrivateBookingWithApi({
+            token: user.token,
+            venuePublicId: gym.id,
+            courtPublicId: selection.court.id,
+            bookingType:
+              selection.court.bookingMode === "open-play"
+                ? "open_play"
+                : "private",
+            bookingDate: selection.date,
+            slotLabels: selection.slots,
+            participantCount: 1,
+            totalAmount: computedAmount,
+            rentals: confirmedRentals ?? [],
+            paymentReceipt,
+            paymentProvider: paymentSetup.provider,
+            paymentAccountNumber: paymentSetup.accountNumber,
+          })
+
+          addBooking({
+            id: createdBooking.public_id,
             gymId: gym.id,
             gym: gym.name,
             address: gym.address,
             courtId: selection.court.id,
             court: selection.court.name,
             date: selection.date,
-            slots: selection.slots,
-            status: "pending",
-            bookingType: "open_play",
-            participantCount: 1,
+            slots: createdBooking.slot_labels,
+            status: createdBooking.status,
+            bookingType: createdBooking.booking_type,
+            participantCount: createdBooking.participant_count,
             rentals: confirmedRentals,
             paymentReceipt,
-            ownerName: user?.name ?? "Guest Player",
-            ownerEmail: user?.email ?? "guest@example.com",
+            ownerName: user.name,
+            ownerEmail: user.email,
           })
 
           addTransaction({
-            id: createdBooking.id,
-            customerName: user?.name ?? "Guest Player",
-            customerEmail: user?.email ?? "guest@example.com",
+            id: createdBooking.public_id,
+            customerName: user.name,
+            customerEmail: user.email,
             gymId: gym.id,
             gym: gym.name,
             courtId: selection.court.id,
             court: selection.court.name,
             date: selection.date,
-            slots: selection.slots,
-            bookingType: "open_play",
-            participantCount: 1,
-            amount:
-              getOpenPlayPricePerPlayer(selection.court) *
-                selection.slots.length +
-              confirmedRentalPerSession,
+            slots: createdBooking.slot_labels,
+            bookingType: createdBooking.booking_type,
+            participantCount: createdBooking.participant_count,
+            amount: createdBooking.total_amount,
             rentals: confirmedRentals,
             paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
-            paymentStatus: "unpaid",
-            status: "pending",
+            paymentStatus: "paid",
+            status: createdBooking.status,
             paymentReceipt,
           })
+        }
+      } catch (error) {
+        if (gymId) {
+          void getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
+            .then((availability) => {
+              setRemoteAvailability(availability)
+            })
+            .catch(() => {
+              // Keep the last availability snapshot if the refresh fails.
+            })
+        }
+        toast.add({
+          title:
+            error instanceof AuthApiError && error.status === 409
+              ? "Booking conflict"
+              : "Booking failed",
+          description: getAuthErrorMessage(
+            error,
+            "Unable to submit your booking right now."
+          ),
+          type: "error",
         })
-      } else {
-        if (!user?.token) {
-          toast.add({
-            title: "Sign in required",
-            description: "Please sign in again before submitting a live booking.",
-            type: "error",
-          })
-          return
-        }
-
-        setIsSubmittingBooking(true)
-        try {
-          for (const selection of bookingSummary) {
-            const computedAmount =
-              selection.court.pricePerHour * selection.slots.length +
-              confirmedRentalPerSession
-
-            const createdBooking = await createPrivateBookingWithApi({
-              token: user.token,
-              venuePublicId: gym.id,
-              courtPublicId: selection.court.id,
-              bookingDate: selection.date,
-              slotLabels: selection.slots,
-              totalAmount: computedAmount,
-              rentals: confirmedRentals ?? [],
-              paymentReceipt,
-              paymentProvider: paymentSetup.provider,
-              paymentAccountNumber: paymentSetup.accountNumber,
-            })
-
-            addBooking({
-              id: createdBooking.public_id,
-              gymId: gym.id,
-              gym: gym.name,
-              address: gym.address,
-              courtId: selection.court.id,
-              court: selection.court.name,
-              date: selection.date,
-              slots: createdBooking.slot_labels,
-              status: createdBooking.status,
-              bookingType: createdBooking.booking_type,
-              participantCount: createdBooking.participant_count,
-              rentals: confirmedRentals,
-              paymentReceipt,
-              ownerName: user.name,
-              ownerEmail: user.email,
-            })
-
-            addTransaction({
-              id: createdBooking.public_id,
-              customerName: user.name,
-              customerEmail: user.email,
-              gymId: gym.id,
-              gym: gym.name,
-              courtId: selection.court.id,
-              court: selection.court.name,
-              date: selection.date,
-              slots: createdBooking.slot_labels,
-              bookingType: "private",
-              participantCount: createdBooking.participant_count,
-              amount: createdBooking.total_amount,
-              rentals: confirmedRentals,
-              paymentMethod: `${paymentSetup.provider} - ${paymentSetup.accountNumber}`,
-              paymentStatus: "paid",
-              status: createdBooking.status,
-              paymentReceipt,
-            })
-          }
-        } catch (error) {
-          toast.add({
-            title:
-              error instanceof AuthApiError && error.status === 409
-                ? "Booking conflict"
-                : "Booking failed",
-            description: getAuthErrorMessage(
-              error,
-              "Unable to submit your booking right now."
-            ),
-            type: "error",
-          })
-          return
-        } finally {
-          setIsSubmittingBooking(false)
-        }
+        return
+      } finally {
+        setIsSubmittingBooking(false)
       }
     }
     toast.add({
@@ -739,7 +883,14 @@ export function GymDetailPage() {
           Back to search
         </Link>
 
-        {!gym ? (
+        {!gym && isLoadingVenue ? (
+          <div className="mt-6 rounded-lg border bg-card p-8 text-center">
+            <p className="font-medium">Loading gym details</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Fetching live courts, payment methods, and slot availability.
+            </p>
+          </div>
+        ) : !gym ? (
           <div className="mt-6 rounded-lg border bg-card p-8 text-center">
             <p className="font-medium">Gym not found</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -755,6 +906,11 @@ export function GymDetailPage() {
         ) : (
           <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
             <div className="grid gap-6">
+              {liveVenueError ? (
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-300">
+                  {liveVenueError}
+                </div>
+              ) : null}
               <section className="overflow-hidden rounded-lg border bg-card shadow-xs">
                 <div className="grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                   <GymPhoto
@@ -1609,3 +1765,4 @@ export function GymDetailPage() {
     </main>
   )
 }
+

@@ -3,6 +3,7 @@ import { CalendarDays, Mail, Phone, ShieldAlert, UserRound } from "lucide-react"
 import { OwnerStatusBadge } from "@/admin/components/owners/owner-status-badge"
 import type {
   OwnerRecord,
+  OwnerTransactionRecord,
   SystemPaymentStatus,
 } from "@/admin/lib/admin-owners-context"
 import { Button } from "@/components/ui/button"
@@ -14,10 +15,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { TransactionStatusBadge } from "@/shared/components/transactions/transaction-status-badge"
-import type { Transaction } from "@/shared/lib/transactions-context"
+import {
+  PaymentStatusBadge as BookingPaymentStatusBadge,
+  TransactionStatusBadge,
+} from "@/shared/components/transactions/transaction-status-badge"
 
-function PaymentStatusBadge({
+function SystemPaymentStatusBadge({
   status,
 }: {
   status: SystemPaymentStatus
@@ -43,15 +46,17 @@ export function OwnerDetailSheet({
   onToggleStatus,
   onSetSystemPaymentStatus,
   onLockUntilPaid,
+  onUnlock,
   settlementSummary,
 }: {
   owner: OwnerRecord | null
-  transactions: Transaction[]
+  transactions: OwnerTransactionRecord[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onToggleStatus: (id: string) => void
   onSetSystemPaymentStatus: (id: string, status: SystemPaymentStatus) => void
   onLockUntilPaid: (id: string) => void
+  onUnlock: (id: string) => void
   settlementSummary: {
     totalGyms: number
     totalCourts: number
@@ -75,7 +80,7 @@ export function OwnerDetailSheet({
             <div className="grid gap-4 px-4">
               <div className="flex flex-wrap items-center gap-2">
                 <OwnerStatusBadge status={owner.status} />
-                <PaymentStatusBadge status={owner.systemPaymentStatus} />
+                <SystemPaymentStatusBadge status={owner.systemPaymentStatus} />
               </div>
 
               {owner.suspensionReason === "system_payment_due" ? (
@@ -154,13 +159,16 @@ export function OwnerDetailSheet({
                       >
                         <div>
                           <p className="font-medium">
-                            {transaction.gym} - {transaction.court}
+                            {transaction.gymName} - {transaction.courtName}
                           </p>
                           <p className="text-muted-foreground">
-                            {transaction.date} - ${transaction.amount}
+                            {transaction.bookingDate} - ${transaction.amount}
                           </p>
                         </div>
-                        <TransactionStatusBadge status={transaction.status} />
+                        <div className="flex flex-col items-end gap-1">
+                          <BookingPaymentStatusBadge status={transaction.paymentStatus} />
+                          <TransactionStatusBadge status={transaction.status} />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -196,6 +204,17 @@ export function OwnerDetailSheet({
                     onClick={() => onLockUntilPaid(owner.id)}
                   >
                     Lock until paid
+                  </Button>
+                ) : null}
+
+                {owner.suspensionReason === "system_payment_due" &&
+                owner.systemPaymentStatus === "paid" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onUnlock(owner.id)}
+                  >
+                    Restore access
                   </Button>
                 ) : null}
 

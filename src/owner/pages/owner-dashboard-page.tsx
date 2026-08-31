@@ -1,12 +1,7 @@
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { CheckCircle2, Clock3, DollarSign, Receipt, XCircle } from "lucide-react"
 
-import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
-import { StatCard } from "@/shared/components/stat-card"
-import { TransactionStatusBadge } from "@/shared/components/transactions/transaction-status-badge"
-import { useGyms } from "@/shared/lib/gyms-context"
-import { useTransactions } from "@/shared/lib/transactions-context"
 import { buttonVariants } from "@/components/ui/button-variants"
 import {
   Card,
@@ -15,49 +10,71 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  getOwnerDashboardWithApi,
+  type OwnerTransactionApiItem,
+} from "@/lib/owner-api"
+import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
+import { StatCard } from "@/shared/components/stat-card"
+import { TransactionStatusBadge } from "@/shared/components/transactions/transaction-status-badge"
+
+type DashboardState = {
+  revenue: number
+  pending: number
+  completed: number
+  cancelled: number
+  recentTransactions: OwnerTransactionApiItem[]
+}
 
 export function OwnerDashboardPage() {
   const { owner } = useOwnerAuth()
-  const { gyms } = useGyms()
-  const { transactions } = useTransactions()
+  const [dashboard, setDashboard] = useState<DashboardState>({
+    revenue: 0,
+    pending: 0,
+    completed: 0,
+    cancelled: 0,
+    recentTransactions: [],
+  })
+  const [error, setError] = useState<string | null>(null)
 
-  const ownedGymIds = useMemo(
-    () => new Set(gyms.filter((gym) => gym.ownerId === owner?.id).map((gym) => gym.id)),
-    [gyms, owner]
-  )
+  useEffect(() => {
+    if (!owner?.token) {
+      return
+    }
 
-  const ownedTransactions = useMemo(
-    () => transactions.filter((transaction) => ownedGymIds.has(transaction.gymId)),
-    [transactions, ownedGymIds]
-  )
+    let isActive = true
 
-  const stats = useMemo(() => {
-    const revenue = ownedTransactions
-      .filter((transaction) => transaction.paymentStatus === "paid")
-      .reduce((sum, transaction) => sum + transaction.amount, 0)
-    const pending = ownedTransactions.filter(
-      (transaction) => transaction.status === "pending"
-    ).length
-    const completed = ownedTransactions.filter(
-      (transaction) => transaction.status === "completed"
-    ).length
-    const cancelled = ownedTransactions.filter(
-      (transaction) => transaction.status === "cancelled"
-    ).length
+    void getOwnerDashboardWithApi(owner.token)
+      .then((response) => {
+        if (!isActive) {
+          return
+        }
 
-    return { revenue, pending, completed, cancelled }
-  }, [ownedTransactions])
+        setDashboard({
+          revenue: response.stats.total_revenue,
+          pending: response.stats.pending_count,
+          completed: response.stats.completed_count,
+          cancelled: response.stats.cancelled_count,
+          recentTransactions: response.recent_transactions,
+        })
+        setError(null)
+      })
+      .catch((nextError) => {
+        if (!isActive) {
+          return
+        }
 
-  const recentTransactions = useMemo(
-    () =>
-      [...ownedTransactions]
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Unable to load dashboard."
         )
-        .slice(0, 5),
-    [ownedTransactions]
-  )
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [owner?.token])
 
   return (
     <div className="grid gap-6">
@@ -74,24 +91,24 @@ export function OwnerDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total revenue"
-          value={`$${stats.revenue}`}
+          value={`$${dashboard.revenue.toFixed(2)}`}
           icon={DollarSign}
           tone="primary"
         />
         <StatCard
           label="Pending"
-          value={String(stats.pending)}
+          value={String(dashboard.pending)}
           icon={Clock3}
           tone="warning"
         />
         <StatCard
           label="Completed"
-          value={String(stats.completed)}
+          value={String(dashboard.completed)}
           icon={CheckCircle2}
         />
         <StatCard
           label="Cancelled"
-          value={String(stats.cancelled)}
+          value={String(dashboard.cancelled)}
           icon={XCircle}
           tone="destructive"
         />
@@ -114,20 +131,26 @@ export function OwnerDashboardPage() {
           </Link>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {recentTransactions.length === 0 ? (
+          {error ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {error}
+            </p>
+          ) : dashboard.recentTransactions.length === 0 ? (
             <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
               No transactions yet for your venues.
             </p>
           ) : (
-            recentTransactions.map((transaction) => (
+            dashboard.recentTransactions.map((transaction) => (
               <div
-                key={transaction.id}
+                key={transaction.public_id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3"
               >
                 <div>
-                  <p className="font-medium">{transaction.customerName}</p>
+                  <p className="font-medium">{transaction.customer_name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {transaction.gym} · {transaction.court} · {transaction.date}
+                    {transaction.venue_name} ·{" "}
+                    {transaction.court_name ?? "Whole gym"} ·{" "}
+                    {transaction.booking_date}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

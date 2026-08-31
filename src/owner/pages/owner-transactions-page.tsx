@@ -2,18 +2,21 @@ import { useEffect, useMemo, useState } from "react"
 
 import {
   approveBookingPaymentWithApi,
+  cancelOwnerBookingWithApi,
   completeOwnerBookingWithApi,
+  rejectBookingPaymentWithApi,
+  refundOwnerBookingWithApi,
+} from "@/lib/booking-api"
+import {
   getOwnerTransactionsWithApi,
   type OwnerTransactionApiItem,
-} from "@/lib/booking-api"
+} from "@/lib/owner-api"
 import { useBookings } from "@/lib/bookings-context"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { TransactionsManager } from "@/shared/components/transactions/transactions-manager"
-import { useGyms } from "@/shared/lib/gyms-context"
 import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
 import type { Transaction } from "@/shared/lib/transactions-context"
 import type { TransactionStatus } from "@/shared/lib/transactions-context"
-import { useTransactions } from "@/shared/lib/transactions-context"
 
 function mapApiTransactionToTransaction(
   transaction: OwnerTransactionApiItem
@@ -63,20 +66,8 @@ function mapApiTransactionToTransaction(
 
 export function OwnerTransactionsPage() {
   const { owner } = useOwnerAuth()
-  const { gyms } = useGyms()
-  const { transactions, setStatus, refund } = useTransactions()
   const { setBookingStatus } = useBookings()
   const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>([])
-
-  const ownedGymIds = useMemo(
-    () => new Set(gyms.filter((gym) => gym.ownerId === owner?.id).map((gym) => gym.id)),
-    [gyms, owner]
-  )
-
-  const ownedTransactions = useMemo(
-    () => transactions.filter((transaction) => ownedGymIds.has(transaction.gymId)),
-    [transactions, ownedGymIds]
-  )
 
   useEffect(() => {
     if (!owner?.token) {
@@ -108,19 +99,13 @@ export function OwnerTransactionsPage() {
     () => new Set(remoteTransactions.map((transaction) => transaction.id)),
     [remoteTransactions]
   )
-
-  const visibleTransactions = useMemo(() => {
-    if (!owner?.token) {
-      return ownedTransactions
-    }
-    const localOnly = ownedTransactions.filter(
-      (transaction) => !liveTransactionIds.has(transaction.id)
-    )
-    return [...remoteTransactions, ...localOnly]
-  }, [liveTransactionIds, ownedTransactions, owner?.token, remoteTransactions])
+  const visibleTransactions = remoteTransactions
 
   async function handleSetStatus(id: string, status: TransactionStatus) {
     const isLiveTransaction = liveTransactionIds.has(id) && !!owner?.token
+    const currentTransaction = visibleTransactions.find(
+      (transaction) => transaction.id === id
+    )
 
     if (isLiveTransaction && status === "confirmed") {
       await approveBookingPaymentWithApi(owner.token!, id)
@@ -140,14 +125,47 @@ export function OwnerTransactionsPage() {
             : transaction
         )
       )
+    } else if (isLiveTransaction && status === "cancelled") {
+      if (currentTransaction?.status === "pending") {
+        await rejectBookingPaymentWithApi(owner.token!, id)
+        setRemoteTransactions((current) =>
+          current.map((transaction) =>
+            transaction.id === id
+              ? { ...transaction, status: "cancelled", paymentStatus: "unpaid" }
+              : transaction
+          )
+        )
+      } else {
+        await cancelOwnerBookingWithApi(owner.token!, id)
+        setRemoteTransactions((current) =>
+          current.map((transaction) =>
+            transaction.id === id
+              ? { ...transaction, status: "cancelled" }
+              : transaction
+          )
+        )
+      }
     }
-
-    setStatus(id, status)
     setBookingStatus(id, status)
   }
 
   async function handleRefund(id: string) {
-    refund(id)
+    const isLiveTransaction = liveTransactionIds.has(id) && !!owner?.token
+
+    if (isLiveTransaction) {
+      await refundOwnerBookingWithApi(owner.token!, id)
+      setRemoteTransactions((current) =>
+        current.map((transaction) =>
+          transaction.id === id
+            ? {
+                ...transaction,
+                status: "cancelled",
+                paymentStatus: "refunded",
+              }
+            : transaction
+        )
+      )
+    }
     setBookingStatus(id, "cancelled")
   }
 

@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
-import { useAdminOwners } from "@/admin/lib/admin-owners-context"
 import { AuthApiError, loginWithApi } from "@/lib/auth-api"
 import { persistStorageItem, readStorageItem } from "@/lib/auth-storage"
 
@@ -37,11 +36,6 @@ type OwnerAuthContextValue = {
 
 const STORAGE_KEY = "pb-owner-auth-user"
 
-const demoOwnerAccounts: OwnerUser[] = [
-  { id: "owner-1", name: "Priya Nair", email: "priya@northsidepb.com" },
-  { id: "owner-2", name: "Marcus Diaz", email: "marcus@riversidesports.com" },
-]
-
 const OwnerAuthContext = React.createContext<OwnerAuthContextValue | undefined>(
   undefined
 )
@@ -61,7 +55,6 @@ function readStoredOwner(): OwnerUser | null {
 }
 
 export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
-  const { owners } = useAdminOwners()
   const [owner, setOwner] = React.useState<OwnerUser | null>(readStoredOwner)
 
   const persistOwner = React.useCallback((nextOwner: OwnerUser | null) => {
@@ -73,19 +66,8 @@ export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
     async ({ email, password }: OwnerLoginInput): Promise<OwnerLoginResult> => {
       try {
         const session = await loginWithApi(email, password, "owner")
-        const matchedRecord =
-          owners.find(
-            (record) =>
-              record.email.toLowerCase() === session.user.email.toLowerCase()
-          ) ??
-          demoOwnerAccounts.find(
-            (account) =>
-              account.email.toLowerCase() === session.user.email.toLowerCase()
-          ) ??
-          null
-
         const resolvedOwner = {
-          id: matchedRecord?.id ?? session.user.public_id,
+          id: session.user.public_id,
           name: session.user.full_name,
           email: session.user.email,
           token: session.access_token,
@@ -108,7 +90,7 @@ export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, reason: "invalid_credentials" }
       }
     },
-    [owners, persistOwner]
+    [persistOwner]
   )
 
   const logout = React.useCallback(() => {

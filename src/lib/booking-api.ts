@@ -9,9 +9,11 @@ const API_BASE_URL =
 export type CreatePrivateBookingInput = {
   token: string
   venuePublicId: string
-  courtPublicId: string
+  courtPublicId: string | null
+  bookingType: "private" | "open_play" | "whole_gym"
   bookingDate: string
   slotLabels: string[]
+  participantCount: number
   totalAmount: number
   rentals: BookingRental[]
   paymentReceipt: PaymentReceipt
@@ -90,6 +92,91 @@ export type BookingActionApiResponse = {
   payment_review_status: "pending" | "approved" | "rejected" | null
 }
 
+export type VenuePaymentMethodApiResponse = {
+  id: number
+  provider: "GCash" | "Bank Transfer" | "Maya" | "Other"
+  display_name: string
+  account_name: string
+  account_number: string
+  instructions: string | null
+  qr_code_image_url: string
+  qr_code_file_name: string
+  is_active: boolean
+}
+
+export type VenueRentalItemApiResponse = {
+  public_id: string
+  name: string
+  category: "paddle" | "ball" | "shoes" | "net" | "other"
+  price_per_session: number
+  quantity_available: number
+  status: "available" | "unavailable"
+  description: string | null
+}
+
+export type VenueCourtApiResponse = {
+  public_id: string
+  name: string
+  surface: string
+  capacity_label: string
+  price_per_hour: number
+  status: "available" | "maintenance"
+  booking_mode: "private" | "open_play"
+  open_play_capacity: number | null
+  available_slots: string[]
+  image_url: string | null
+}
+
+export type VenueWholeGymBookingApiResponse = {
+  enabled: boolean
+  price_per_hour: number | null
+  available_slots: string[]
+  notes: string | null
+}
+
+export type VenueDetailApiResponse = {
+  public_id: string
+  owner_public_id: string
+  name: string
+  address: string
+  phone: string | null
+  status: "active" | "inactive"
+  image_url: string | null
+  payment_methods: VenuePaymentMethodApiResponse[]
+  whole_gym_booking: VenueWholeGymBookingApiResponse | null
+  rental_items: VenueRentalItemApiResponse[]
+  courts: VenueCourtApiResponse[]
+}
+
+export type VenueAvailabilityItemApiResponse = {
+  date: string
+  slot_label: string
+  state: "available" | "booked" | "closed"
+  booking_public_id: string | null
+  booking_type: "private" | "open_play" | "whole_gym" | null
+  seats_taken: number | null
+  seats_capacity: number | null
+}
+
+export type VenueCourtAvailabilityApiResponse = {
+  court_public_id: string
+  court_name: string
+  booking_mode: "private" | "open_play"
+  items: VenueAvailabilityItemApiResponse[]
+}
+
+export type VenueWholeGymAvailabilityApiResponse = {
+  items: VenueAvailabilityItemApiResponse[]
+}
+
+export type VenueAvailabilityApiResponse = {
+  venue_public_id: string
+  date_from: string
+  days: number
+  courts: VenueCourtAvailabilityApiResponse[]
+  whole_gym: VenueWholeGymAvailabilityApiResponse | null
+}
+
 export async function createPrivateBookingWithApi(
   input: CreatePrivateBookingInput
 ) {
@@ -102,10 +189,10 @@ export async function createPrivateBookingWithApi(
     body: JSON.stringify({
       venue_public_id: input.venuePublicId,
       court_public_id: input.courtPublicId,
-      booking_type: "private",
+      booking_type: input.bookingType,
       booking_date: input.bookingDate,
       slot_labels: input.slotLabels,
-      participant_count: 1,
+      participant_count: input.participantCount,
       total_amount: input.totalAmount,
       rentals: input.rentals.map((rental) => ({
         rental_item_public_id: rental.itemId,
@@ -199,7 +286,7 @@ export async function getOwnerTransactionsWithApi(token: string) {
 async function postOwnerBookingAction(
   token: string,
   bookingPublicId: string,
-  action: "approve" | "complete"
+  action: "approve" | "reject" | "complete" | "cancel" | "refund"
 ) {
   const response = await fetch(
     `${API_BASE_URL}/bookings/${bookingPublicId}/${action}`,
@@ -243,4 +330,81 @@ export function completeOwnerBookingWithApi(
   bookingPublicId: string
 ) {
   return postOwnerBookingAction(token, bookingPublicId, "complete")
+}
+
+export function rejectBookingPaymentWithApi(
+  token: string,
+  bookingPublicId: string
+) {
+  return postOwnerBookingAction(token, bookingPublicId, "reject")
+}
+
+export function cancelOwnerBookingWithApi(
+  token: string,
+  bookingPublicId: string
+) {
+  return postOwnerBookingAction(token, bookingPublicId, "cancel")
+}
+
+export function refundOwnerBookingWithApi(
+  token: string,
+  bookingPublicId: string
+) {
+  return postOwnerBookingAction(token, bookingPublicId, "refund")
+}
+
+export async function getVenueDetailWithApi(venuePublicId: string) {
+  const response = await fetch(`${API_BASE_URL}/venues/${venuePublicId}`)
+
+  let payload: VenueDetailApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to load venue details right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as VenueDetailApiResponse
+}
+
+export async function getVenueAvailabilityWithApi(
+  venuePublicId: string,
+  dateFrom: string,
+  days: number
+) {
+  const searchParams = new URLSearchParams({
+    date_from: dateFrom,
+    days: String(days),
+  })
+  const response = await fetch(
+    `${API_BASE_URL}/venues/${venuePublicId}/availability?${searchParams.toString()}`
+  )
+
+  let payload: VenueAvailabilityApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to load venue availability right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as VenueAvailabilityApiResponse
 }

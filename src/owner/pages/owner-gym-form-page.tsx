@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeft,
@@ -18,7 +18,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
+import {
+  createOwnerVenueWithApi,
+  getOwnerVenuesWithApi,
+  updateOwnerVenueWithApi,
+} from "@/lib/owner-api"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
+import { mapOwnerVenueToGym } from "@/owner/lib/owner-venue-mappers"
 import { RentalGearEditor } from "@/shared/components/gyms/rental-gear-editor"
 import type { RentalItemDraft } from "@/shared/components/gyms/rental-gear-utils"
 import {
@@ -36,7 +42,7 @@ import type {
   PaymentProvider,
   RentalItem,
 } from "@/shared/lib/gyms-context"
-import { useGyms } from "@/shared/lib/gyms-context"
+import type { Gym } from "@/shared/lib/gyms-context"
 
 type DetailsDraft = {
   name: string
@@ -145,15 +151,47 @@ export function OwnerGymFormPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const { owner } = useOwnerAuth()
-  const { gyms, addGym, updateGym } = useGyms()
+  const [availableGyms, setAvailableGyms] = useState<Gym[]>([])
+  const [loadingError, setLoadingError] = useState<string | null>(null)
+  const [hasLoadedGyms, setHasLoadedGyms] = useState(false)
+
+  useEffect(() => {
+    if (!owner?.token) {
+      return
+    }
+
+    let isActive = true
+    void getOwnerVenuesWithApi(owner.token)
+      .then((items) => {
+        if (!isActive) {
+          return
+        }
+        setAvailableGyms(items.map(mapOwnerVenueToGym))
+        setLoadingError(null)
+        setHasLoadedGyms(true)
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return
+        }
+        setLoadingError(
+          error instanceof Error ? error.message : "Unable to load owner venues."
+        )
+        setHasLoadedGyms(true)
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [owner?.token])
 
   const editingGym = useMemo(
-    () => (gymId ? (gyms.find((gym) => gym.id === gymId) ?? null) : null),
-    [gyms, gymId]
+    () => (gymId ? availableGyms.find((gym) => gym.id === gymId) ?? null : null),
+    [availableGyms, gymId]
   )
 
   const isEditing = Boolean(gymId)
-  const canEdit = !isEditing || (editingGym && editingGym.ownerId === owner?.id)
+  const canEdit = !isEditing || !hasLoadedGyms || (editingGym && editingGym.ownerId === owner?.id)
 
   const [stepIndex, setStepIndex] = useState(0)
   const [showErrors, setShowErrors] = useState(false)
@@ -254,7 +292,7 @@ export function OwnerGymFormPage() {
     setStepIndex(nextIndex)
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!detailsAreValid) {
       setShowErrors(true)
       setStepIndex(0)
@@ -313,23 +351,32 @@ export function OwnerGymFormPage() {
         : undefined,
     }
 
-    if (editingGym) {
-      updateGym(editingGym.id, values)
+    try {
+      if (editingGym) {
+        await updateOwnerVenueWithApi(owner.token!, editingGym.id, values)
+        toast.add({
+          title: "Gym updated",
+          description: `${values.name} has been updated.`,
+          type: "success",
+        })
+      } else {
+        await createOwnerVenueWithApi(owner.token!, values)
+        toast.add({
+          title: "Gym added",
+          description: `${values.name} is now part of your venues.`,
+          type: "success",
+        })
+      }
+
+      navigate("/owner/gyms")
+    } catch (error) {
       toast.add({
-        title: "Gym updated",
-        description: `${values.name} has been updated.`,
-        type: "success",
-      })
-    } else {
-      addGym({ ...values, ownerId: owner.id })
-      toast.add({
-        title: "Gym added",
-        description: `${values.name} is now part of your venues.`,
-        type: "success",
+        title: "Unable to save gym",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
       })
     }
-
-    navigate("/owner/gyms")
   }
 
   const activeStep = steps[stepIndex]
@@ -356,6 +403,9 @@ export function OwnerGymFormPage() {
               ? "Update this venue's details, payment collection, and whole gym availability."
               : "Set up your venue in three steps. You can add courts once the venue is saved."}
           </p>
+          {loadingError ? (
+            <p className="mt-2 text-sm text-destructive">{loadingError}</p>
+          ) : null}
         </div>
       </div>
 
