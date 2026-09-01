@@ -36,6 +36,7 @@ import type {
 } from "@/lib/bookings-context"
 import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
+import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import { getRentalTotal } from "@/shared/lib/gyms-context"
 
@@ -483,14 +484,14 @@ function BookingRow({
                     {rental.quantity} × {rental.name}
                   </span>
                   <span className="shrink-0 font-medium">
-                    ${rental.pricePerSession * rental.quantity}
+                    {formatCurrency(rental.pricePerSession * rental.quantity)}
                   </span>
                 </div>
               ))}
               <div className="flex items-center justify-between gap-3 border-t pt-1 text-xs text-muted-foreground">
                 <span>Gear subtotal</span>
                 <span className="font-medium text-foreground">
-                  ${getRentalTotal(booking.rentals)}
+                  {formatCurrency(getRentalTotal(booking.rentals))}
                 </span>
               </div>
             </div>
@@ -508,7 +509,7 @@ function BookingRow({
               <BadgeDollarSign className="size-4" aria-hidden="true" />
               Pasalo asking price:{" "}
               <span className="font-medium text-foreground">
-                ${booking.pasalo.askingPrice}
+                {formatCurrency(booking.pasalo.askingPrice)}
               </span>
             </p>
           ) : null}

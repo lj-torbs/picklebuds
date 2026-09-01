@@ -13,6 +13,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/toast"
+import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import { useAdminAuth } from "@/admin/lib/admin-auth-context"
 const quickFilters = ["all", "paid", "unpaid", "suspended"] as const
@@ -29,10 +30,6 @@ function ownerMatchesQuery(owner: OwnerRecord, query: string) {
     owner.name.toLowerCase().includes(normalizedQuery) ||
     owner.email.toLowerCase().includes(normalizedQuery)
   )
-}
-
-function formatCurrency(value: number) {
-  return `$${value.toFixed(2)}`
 }
 
 function PaymentStatusBadge({

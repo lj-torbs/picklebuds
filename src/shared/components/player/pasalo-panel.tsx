@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/toast"
 import { useAuth } from "@/lib/auth-context"
 import type { Booking } from "@/lib/bookings-context"
 import { useBookings } from "@/lib/bookings-context"
+import { formatCurrency } from "@/lib/currency"
 import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
 
 type ClaimDraft = {
@@ -329,7 +330,7 @@ export function PasaloPanel() {
                         Asking price
                       </span>
                       <span className="text-lg font-semibold">
-                        ${getOfferTotal(booking)}
+                        {formatCurrency(getOfferTotal(booking))}
                       </span>
                     </div>
                   </button>
@@ -406,7 +407,7 @@ export function PasaloPanel() {
                           Transfer amount
                         </span>
                         <span className="font-semibold">
-                          ${getOfferTotal(selectedBooking)}
+                          {formatCurrency(getOfferTotal(selectedBooking))}
                         </span>
                       </div>
                     </div>

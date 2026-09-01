@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/lib/currency"
+
 export type PaymentReceipt = {
   referenceNumber: string
   accountName: string
@@ -37,7 +39,7 @@ export function createMockPaymentReceipt({
       <text x="96" y="508" font-family="Arial, sans-serif" font-size="20" fill="#6b7280">Reference number</text>
       <text x="96" y="544" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">${referenceNumber}</text>
       <text x="96" y="616" font-family="Arial, sans-serif" font-size="20" fill="#6b7280">Amount sent</text>
-      <text x="96" y="652" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">$${amount.toFixed(2)}</text>
+      <text x="96" y="652" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">${formatCurrency(amount)}</text>
       <text x="96" y="724" font-family="Arial, sans-serif" font-size="20" fill="#6b7280">Uploaded at</text>
       <text x="96" y="760" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">${uploadedAt}</text>
       <rect x="96" y="832" width="528" height="280" rx="20" fill="#111827"/>

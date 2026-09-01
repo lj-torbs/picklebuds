@@ -40,6 +40,7 @@ import {
 } from "@/lib/booking-api"
 import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
+import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import {
   AvailabilityCalendar,
@@ -1102,9 +1103,8 @@ export function GymDetailPage() {
                                 {court.bookingMode === "open-play" &&
                                 court.openPlayCapacity ? (
                                   <>
-                                    $
-                                    {getOpenPlayPricePerPlayer(court).toFixed(
-                                      2
+                                    {formatCurrency(
+                                      getOpenPlayPricePerPlayer(court)
                                     )}
                                     <span className="font-normal text-muted-foreground">
                                       /player
@@ -1112,7 +1112,7 @@ export function GymDetailPage() {
                                   </>
                                 ) : (
                                   <>
-                                    ${court.pricePerHour}
+                                    {formatCurrency(court.pricePerHour)}
                                     <span className="font-normal text-muted-foreground">
                                       /hr
                                     </span>
@@ -1154,7 +1154,7 @@ export function GymDetailPage() {
                     </div>
                     {wholeGymSetup ? (
                       <p className="text-sm font-medium text-primary">
-                        ${wholeGymSetup.pricePerHour}/hr
+                        {formatCurrency(wholeGymSetup.pricePerHour)}/hr
                       </p>
                     ) : null}
                   </div>
@@ -1212,8 +1212,8 @@ export function GymDetailPage() {
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
                     Open Play on this court allows up to{" "}
                     {selectedCourt.openPlayCapacity} players per session. Each
-                    player pays $
-                    {getOpenPlayPricePerPlayer(selectedCourt).toFixed(2)} per
+                    player pays{" "}
+                    {formatCurrency(getOpenPlayPricePerPlayer(selectedCourt))} per
                     slot. Session tiles show booked players as
                     `current/capacity`, and once you select a slot the count
                     updates to include your seat.
@@ -1306,7 +1306,9 @@ export function GymDetailPage() {
                           Open Play seat price
                         </span>
                         <span className="font-medium">
-                          ${getOpenPlayPricePerPlayer(selectedCourt).toFixed(2)}
+                          {formatCurrency(
+                            getOpenPlayPricePerPlayer(selectedCourt)
+                          )}
                         </span>
                       </div>
                     ) : null}
@@ -1316,7 +1318,7 @@ export function GymDetailPage() {
                           Whole gym rate
                         </span>
                         <span className="font-medium">
-                          ${wholeGymSetup.pricePerHour}/hr
+                          {formatCurrency(wholeGymSetup.pricePerHour)}/hr
                         </span>
                       </div>
                     ) : null}
@@ -1388,10 +1390,10 @@ export function GymDetailPage() {
                             {selection.court.bookingMode === "open-play" &&
                             selection.court.openPlayCapacity ? (
                               <p className="mt-1 text-xs text-primary">
-                                1 seat at $
+                                1 seat at{" "}
                                 {getOpenPlayPricePerPlayer(
                                   selection.court
-                                ).toFixed(2)}{" "}
+                                ))}
                                 per slot · projected occupancy updates in the
                                 calendar
                               </p>
@@ -1490,7 +1492,8 @@ export function GymDetailPage() {
                                             item.category
                                           ]
                                         }{" "}
-                                        · ${item.pricePerSession} per session
+                                        · {formatCurrency(item.pricePerSession)} per
+                                        session
                                       </p>
                                     </div>
                                     <span
@@ -1553,7 +1556,9 @@ export function GymDetailPage() {
                                     </div>
                                     {quantity > 0 ? (
                                       <span className="text-sm font-medium text-primary">
-                                        ${item.pricePerSession * quantity}
+                                        {formatCurrency(
+                                          item.pricePerSession * quantity
+                                        )}
                                         <span className="text-xs font-normal text-muted-foreground">
                                           {" "}
                                           / session
@@ -1568,9 +1573,10 @@ export function GymDetailPage() {
 
                           {rentalPerSession > 0 ? (
                             <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
-                              ${rentalPerSession} of gear per session
+                              {formatCurrency(rentalPerSession)} of gear per
+                              session
                               {sessionCount > 1
-                                ? ` × ${sessionCount} dates = $${rentalTotal}`
+                                ? ` × ${sessionCount} dates = ${formatCurrency(rentalTotal)}`
                                 : null}
                             </p>
                           ) : null}
@@ -1703,7 +1709,7 @@ export function GymDetailPage() {
                         Estimated total
                       </span>
                       <span className="text-xl font-semibold text-primary">
-                        ${estimatedTotal}
+                        {formatCurrency(estimatedTotal)}
                       </span>
                     </div>
                     <p className="text-xs text-primary/80">
@@ -1718,7 +1724,7 @@ export function GymDetailPage() {
                         <div className="flex items-center justify-between gap-3">
                           <span>Court charge</span>
                           <span className="font-medium">
-                            ${courtChargeTotal}
+                            {formatCurrency(courtChargeTotal)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
@@ -1728,7 +1734,9 @@ export function GymDetailPage() {
                               ? ` (${sessionCount} sessions)`
                               : null}
                           </span>
-                          <span className="font-medium">${rentalTotal}</span>
+                          <span className="font-medium">
+                            {formatCurrency(rentalTotal)}
+                          </span>
                         </div>
                       </div>
                     ) : null}

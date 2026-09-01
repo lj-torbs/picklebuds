@@ -7,6 +7,7 @@ import type {
   SystemPaymentStatus,
 } from "@/admin/lib/admin-owners-context"
 import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/currency"
 import {
   Sheet,
   SheetContent,
@@ -130,13 +131,13 @@ export function OwnerDetailSheet({
                       <p className="text-xs uppercase text-muted-foreground">
                         Owner total profit
                       </p>
-                      <p className="font-semibold">${settlementSummary.ownerProfit.toFixed(2)}</p>
+                      <p className="font-semibold">{formatCurrency(settlementSummary.ownerProfit)}</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase text-muted-foreground">
                         System share
                       </p>
-                      <p className="font-semibold">${settlementSummary.systemShare.toFixed(2)}</p>
+                      <p className="font-semibold">{formatCurrency(settlementSummary.systemShare)}</p>
                     </div>
                   </div>
                 </div>
@@ -162,7 +163,7 @@ export function OwnerDetailSheet({
                             {transaction.gymName} - {transaction.courtName}
                           </p>
                           <p className="text-muted-foreground">
-                            {transaction.bookingDate} - ${transaction.amount}
+                            {transaction.bookingDate} - {formatCurrency(transaction.amount)}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">

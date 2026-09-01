@@ -5,6 +5,7 @@ import { ArrowRight, Clock3, MapPin, Search, UsersRound } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button-variants"
 import { Input } from "@/components/ui/input"
 import { useBookings } from "@/lib/bookings-context"
+import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import { GymPhoto } from "@/shared/components/gyms/gym-photo"
 import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
@@ -200,7 +201,7 @@ export function OpenPlayPanel() {
                   />
                   <div className="absolute inset-x-2 bottom-2">
                     <span className="inline-flex rounded-md bg-background/95 px-2 py-1 text-[11px] font-medium text-foreground">
-                      ${getOpenPlayPrice(court).toFixed(2)} / player
+                      {formatCurrency(getOpenPlayPrice(court))} / player
                     </span>
                   </div>
                 </div>

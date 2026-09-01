@@ -14,6 +14,7 @@ import {
   getOwnerDashboardWithApi,
   type OwnerTransactionApiItem,
 } from "@/lib/owner-api"
+import { formatCurrency } from "@/lib/currency"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { StatCard } from "@/shared/components/stat-card"
 import { TransactionStatusBadge } from "@/shared/components/transactions/transaction-status-badge"
@@ -91,7 +92,7 @@ export function OwnerDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total revenue"
-          value={`$${dashboard.revenue.toFixed(2)}`}
+          value={formatCurrency(dashboard.revenue)}
           icon={DollarSign}
           tone="primary"
         />
@@ -154,7 +155,7 @@ export function OwnerDashboardPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-medium">${transaction.amount}</span>
+                  <span className="font-medium">{formatCurrency(transaction.amount)}</span>
                   <TransactionStatusBadge status={transaction.status} />
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
+import { formatCurrency } from "@/lib/currency"
 import { TransactionDetailSheet } from "@/shared/components/transactions/transaction-detail-sheet"
 import { TransactionTable } from "@/shared/components/transactions/transaction-table"
 import type { Transaction, TransactionStatus } from "@/shared/lib/transactions-context"
@@ -225,7 +226,7 @@ export function TransactionsManager({
                 Revenue
               </span>
               <span className="text-xl font-semibold text-primary">
-                ${report.revenue.toFixed(2)}
+                {formatCurrency(report.revenue)}
               </span>
             </div>
             <CircleDollarSign className="size-4 text-primary" aria-hidden="true" />
@@ -236,7 +237,7 @@ export function TransactionsManager({
                 Refunded
               </span>
               <span className="text-xl font-semibold text-destructive">
-                ${report.refunded.toFixed(2)}
+                {formatCurrency(report.refunded)}
               </span>
             </div>
             <ReceiptText className="size-4 text-destructive" aria-hidden="true" />

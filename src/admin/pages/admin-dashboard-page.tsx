@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import { CheckCircle2, Clock3, DollarSign, Receipt, XCircle } from "lucide-react"
 
+import { formatCurrency } from "@/lib/currency"
 import { TransactionStatusBadge } from "@/shared/components/transactions/transaction-status-badge"
 import { StatCard } from "@/shared/components/stat-card"
 import { useTransactions } from "@/shared/lib/transactions-context"
@@ -60,7 +61,7 @@ export function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total revenue"
-          value={`$${stats.revenue}`}
+          value={formatCurrency(stats.revenue)}
           icon={DollarSign}
           tone="primary"
         />
@@ -112,7 +113,7 @@ export function AdminDashboardPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="font-medium">${transaction.amount}</span>
+                <span className="font-medium">{formatCurrency(transaction.amount)}</span>
                 <TransactionStatusBadge status={transaction.status} />
               </div>
             </div>

@@ -510,7 +510,7 @@ function GymFormBody({
           {wholeGymBooking.enabled ? (
             <>
               <div className="grid gap-2">
-                <Label htmlFor="whole-gym-price">Whole gym price per hour ($)</Label>
+                <Label htmlFor="whole-gym-price">Whole gym price per hour (₱)</Label>
                 <Input
                   id="whole-gym-price"
                   type="number"

@@ -16,6 +16,7 @@ import {
 } from "@/shared/components/gyms/gym-status-badge"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/currency"
 import {
   Card,
   CardContent,
@@ -205,7 +206,7 @@ export function GymCard({
           {gym.wholeGymBooking?.enabled ? (
             <div className="grid gap-1 text-sm">
               <span className="font-medium">
-                ${gym.wholeGymBooking.pricePerHour}/hr for exclusive venue use
+                {formatCurrency(gym.wholeGymBooking.pricePerHour)}/hr for exclusive venue use
               </span>
               <span className="text-muted-foreground">
                 {gym.wholeGymBooking.availableSlots.length} slots available
@@ -243,7 +244,7 @@ export function GymCard({
                     </span>
                   </span>
                   <span className="shrink-0 font-medium">
-                    ${item.pricePerSession}
+                    {formatCurrency(item.pricePerSession)}
                     <span className="text-xs font-normal text-muted-foreground">
                       /session
                     </span>
@@ -293,7 +294,7 @@ export function GymCard({
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {court.surface} - {court.capacity} - ${court.pricePerHour}
+                      {court.surface} - {court.capacity} - {formatCurrency(court.pricePerHour)}
                       /hr - {court.availableSlots.length} slots
                       {court.bookingMode === "open-play" &&
                       court.openPlayCapacity

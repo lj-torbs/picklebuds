@@ -24,6 +24,7 @@ import {
   getVenuesWithApi,
   type VenueDetailApiResponse,
 } from "@/lib/booking-api"
+import { formatCurrency, pesoSymbol } from "@/lib/currency"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 
@@ -78,7 +79,9 @@ function getPriceRange(courts: Court[]) {
   const min = Math.min(...prices)
   const max = Math.max(...prices)
 
-  return min === max ? `$${min}/hr` : `$${min}-${max}/hr`
+  return min === max
+    ? `${formatCurrency(min)}/hr`
+    : `${formatCurrency(min)}-${formatCurrency(max)}/hr`
 }
 
 function courtMatchesPrice(court: Court, filter: PriceFilter) {
@@ -366,9 +369,9 @@ export function BookingPage() {
                 aria-label="Filter by price"
               >
                 <option value="all">Any price</option>
-                <option value="budget">$12/hr and below</option>
-                <option value="standard">$13-$15/hr</option>
-                <option value="premium">$16/hr and up</option>
+                <option value="budget">{pesoSymbol}12/hr and below</option>
+                <option value="standard">{pesoSymbol}13-{pesoSymbol}15/hr</option>
+                <option value="premium">{pesoSymbol}16/hr and up</option>
               </select>
               <select
                 value={availabilityFilter}
@@ -472,7 +475,7 @@ export function BookingPage() {
                                 Whole gym available
                               </span>
                               <span className="font-semibold text-primary">
-                                ${gym.wholeGymBooking.pricePerHour}/hr
+                                {formatCurrency(gym.wholeGymBooking.pricePerHour)}/hr
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-primary/80">

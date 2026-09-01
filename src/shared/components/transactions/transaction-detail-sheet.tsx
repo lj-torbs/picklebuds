@@ -14,6 +14,7 @@ import {
   PaymentStatusBadge,
   TransactionStatusBadge,
 } from "@/shared/components/transactions/transaction-status-badge"
+import { formatCurrency } from "@/lib/currency"
 import { getRentalTotal } from "@/shared/lib/gyms-context"
 import type { Transaction } from "@/shared/lib/transactions-context"
 import { Button } from "@/components/ui/button"
@@ -109,7 +110,7 @@ export function TransactionDetailSheet({
                     Amount
                   </span>
                   <span className="mt-1 block text-lg font-semibold">
-                    ${transaction.amount}
+                    {formatCurrency(transaction.amount)}
                   </span>
                 </div>
                 <div className="rounded-lg bg-muted p-3">
@@ -137,14 +138,14 @@ export function TransactionDetailSheet({
                         {rental.quantity} × {rental.name}
                       </span>
                       <span className="shrink-0 font-medium">
-                        ${rental.pricePerSession * rental.quantity}
+                        {formatCurrency(rental.pricePerSession * rental.quantity)}
                       </span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between gap-3 border-t pt-1.5 text-xs text-muted-foreground">
                     <span>Included in the amount above</span>
                     <span className="font-medium text-foreground">
-                      ${getRentalTotal(transaction.rentals)}
+                      {formatCurrency(getRentalTotal(transaction.rentals))}
                     </span>
                   </div>
                 </div>

@@ -4,6 +4,7 @@ import {
   PaymentStatusBadge,
   TransactionStatusBadge,
 } from "@/shared/components/transactions/transaction-status-badge"
+import { formatCurrency } from "@/lib/currency"
 import type { Transaction } from "@/shared/lib/transactions-context"
 import { Button } from "@/components/ui/button"
 
@@ -70,7 +71,7 @@ export function TransactionTable({
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-2.5 font-medium">${transaction.amount}</td>
+              <td className="px-4 py-2.5 font-medium">{formatCurrency(transaction.amount)}</td>
               <td className="px-4 py-2.5">
                 <div className="grid gap-1">
                   <span className="text-xs font-medium text-muted-foreground">

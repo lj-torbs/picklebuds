@@ -195,7 +195,7 @@ function CourtFormBody({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="court-price">Price per hour ($)</Label>
+          <Label htmlFor="court-price">Price per hour (₱)</Label>
           <Input
             id="court-price"
             type="number"
