@@ -23,6 +23,7 @@ import {
   getOwnerVenuesWithApi,
   updateOwnerVenueWithApi,
 } from "@/lib/owner-api"
+import { OwnerWorkspaceHero } from "@/owner/components/layout/owner-workspace-hero"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { mapOwnerVenueToGym } from "@/owner/lib/owner-venue-mappers"
 import { RentalGearEditor } from "@/shared/components/gyms/rental-gear-editor"
@@ -117,7 +118,10 @@ const steps = [
   },
 ] as const
 
-function readImageFile(file: File | undefined, onLoad: (dataUrl: string) => void) {
+function readImageFile(
+  file: File | undefined,
+  onLoad: (dataUrl: string) => void
+) {
   if (!file || !file.type.startsWith("image/")) {
     return
   }
@@ -133,7 +137,9 @@ function readImageFile(file: File | undefined, onLoad: (dataUrl: string) => void
 
 function paymentIsComplete(option: PaymentSetupDraft) {
   return Boolean(
-    option.accountName.trim() && option.accountNumber.trim() && option.qrCodeImageUrl
+    option.accountName.trim() &&
+    option.accountNumber.trim() &&
+    option.qrCodeImageUrl
   )
 }
 
@@ -175,7 +181,9 @@ export function OwnerGymFormPage() {
           return
         }
         setLoadingError(
-          error instanceof Error ? error.message : "Unable to load owner venues."
+          error instanceof Error
+            ? error.message
+            : "Unable to load owner venues."
         )
         setHasLoadedGyms(true)
       })
@@ -186,12 +194,16 @@ export function OwnerGymFormPage() {
   }, [owner?.token])
 
   const editingGym = useMemo(
-    () => (gymId ? availableGyms.find((gym) => gym.id === gymId) ?? null : null),
+    () =>
+      gymId ? (availableGyms.find((gym) => gym.id === gymId) ?? null) : null,
     [availableGyms, gymId]
   )
 
   const isEditing = Boolean(gymId)
-  const canEdit = !isEditing || !hasLoadedGyms || (editingGym && editingGym.ownerId === owner?.id)
+  const canEdit =
+    !isEditing ||
+    !hasLoadedGyms ||
+    (editingGym && editingGym.ownerId === owner?.id)
 
   const [stepIndex, setStepIndex] = useState(0)
   const [showErrors, setShowErrors] = useState(false)
@@ -321,7 +333,10 @@ export function OwnerGymFormPage() {
     wholeGymPrice > 0 &&
     normalizedWholeGymSlots.length > 0
 
-  function updatePaymentOption(index: number, update: Partial<PaymentSetupDraft>) {
+  function updatePaymentOption(
+    index: number,
+    update: Partial<PaymentSetupDraft>
+  ) {
     setPaymentOptions((current) =>
       current.map((option, currentIndex) =>
         currentIndex === index ? { ...option, ...update } : option
@@ -442,20 +457,19 @@ export function OwnerGymFormPage() {
           Back to my gyms
         </Link>
 
-        <div>
-          <p className="text-sm font-medium text-primary">Venues</p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-            {editingGym ? `Edit ${editingGym.name}` : "Add a venue"}
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {editingGym
-              ? "Update this venue's details, payment collection, and whole gym availability."
-              : "Set up your venue in three steps. You can add courts once the venue is saved."}
-          </p>
-          {loadingError ? (
-            <p className="mt-2 text-sm text-destructive">{loadingError}</p>
-          ) : null}
-        </div>
+        <OwnerWorkspaceHero
+          eyebrow="Venues"
+          title={editingGym ? `Edit ${editingGym.name}` : "Add a venue"}
+          description={
+            editingGym
+              ? "Update venue details, payment collection, and whole gym availability inside your branded owner workspace."
+              : "Set up a new venue, connect payment methods, and configure exclusive venue booking before courts are added."
+          }
+          meta={editingGym ? "Edit venue" : "New venue"}
+        />
+        {loadingError ? (
+          <p className="text-sm text-destructive">{loadingError}</p>
+        ) : null}
       </div>
 
       <ol className="grid gap-3 rounded-lg border bg-card p-4 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
@@ -480,8 +494,10 @@ export function OwnerGymFormPage() {
                 <span
                   className={cn(
                     "flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
-                    isCurrent && "border-primary bg-primary text-primary-foreground",
-                    isComplete && "border-primary/40 bg-primary/10 text-primary",
+                    isCurrent &&
+                      "border-primary bg-primary text-primary-foreground",
+                    isComplete &&
+                      "border-primary/40 bg-primary/10 text-primary",
                     !isCurrent && !isComplete && "text-muted-foreground"
                   )}
                 >
@@ -548,7 +564,9 @@ export function OwnerGymFormPage() {
                   placeholder="e.g. Northside Pickleball Club"
                 />
                 {showErrors && detailsErrors.name ? (
-                  <p className="text-xs text-destructive">A gym name is required.</p>
+                  <p className="text-xs text-destructive">
+                    A gym name is required.
+                  </p>
                 ) : null}
               </div>
 
@@ -567,7 +585,9 @@ export function OwnerGymFormPage() {
                   placeholder="Street, barangay, city"
                 />
                 {showErrors && detailsErrors.address ? (
-                  <p className="text-xs text-destructive">An address is required.</p>
+                  <p className="text-xs text-destructive">
+                    An address is required.
+                  </p>
                 ) : null}
               </div>
 
@@ -594,7 +614,9 @@ export function OwnerGymFormPage() {
                       key={status}
                       type="button"
                       size="sm"
-                      variant={details.status === status ? "default" : "outline"}
+                      variant={
+                        details.status === status ? "default" : "outline"
+                      }
                       className="capitalize"
                       onClick={() =>
                         setDetails((current) => ({ ...current, status }))
@@ -653,7 +675,10 @@ export function OwnerGymFormPage() {
                         size="sm"
                         variant="destructive"
                         onClick={() =>
-                          setDetails((current) => ({ ...current, imageUrl: "" }))
+                          setDetails((current) => ({
+                            ...current,
+                            imageUrl: "",
+                          }))
                         }
                       >
                         <Trash2 className="size-4" aria-hidden="true" />
@@ -675,7 +700,8 @@ export function OwnerGymFormPage() {
                       Drop a photo, or click to upload
                     </span>
                     <span className="w-full text-xs text-muted-foreground">
-                      A venue photo helps players recognise this gym in listings.
+                      A venue photo helps players recognise this gym in
+                      listings.
                     </span>
                   </button>
                 )}
@@ -687,7 +713,10 @@ export function OwnerGymFormPage() {
                   className="sr-only"
                   onChange={(event) =>
                     readImageFile(event.target.files?.[0], (dataUrl) =>
-                      setDetails((current) => ({ ...current, imageUrl: dataUrl }))
+                      setDetails((current) => ({
+                        ...current,
+                        imageUrl: dataUrl,
+                      }))
                     )
                   }
                 />
@@ -706,8 +735,8 @@ export function OwnerGymFormPage() {
                 />
                 <span>
                   {droppedPayments} payment{" "}
-                  {droppedPayments === 1 ? "method is" : "methods are"} missing an
-                  account name, account number, or QR code, and{" "}
+                  {droppedPayments === 1 ? "method is" : "methods are"} missing
+                  an account name, account number, or QR code, and{" "}
                   {droppedPayments === 1 ? "it won't" : "they won't"} be saved.
                 </span>
               </p>
@@ -797,7 +826,9 @@ export function OwnerGymFormPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor={`payment-qr-${index}`}>Payment QR code</Label>
+                    <Label htmlFor={`payment-qr-${index}`}>
+                      Payment QR code
+                    </Label>
                     <Input
                       id={`payment-qr-${index}`}
                       type="file"
@@ -969,8 +1000,8 @@ export function OwnerGymFormPage() {
                 />
                 <span>
                   {droppedRentals} gear{" "}
-                  {droppedRentals === 1 ? "item is" : "items are"} incomplete and{" "}
-                  {droppedRentals === 1 ? "won't" : "won't"} be saved.
+                  {droppedRentals === 1 ? "item is" : "items are"} incomplete
+                  and {droppedRentals === 1 ? "won't" : "won't"} be saved.
                 </span>
               </p>
             ) : null}
@@ -1009,9 +1040,7 @@ export function OwnerGymFormPage() {
               </Button>
             ) : null}
             {isEditing ? (
-              <Button type="submit">
-                Save changes
-              </Button>
+              <Button type="submit">Save changes</Button>
             ) : (
               <>
                 {isLastStep ? (

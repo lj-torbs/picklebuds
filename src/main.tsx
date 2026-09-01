@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/lib/auth-context"
 import { BookingsProvider } from "@/lib/bookings-context"
 import { OwnerAuthProvider } from "@/owner/lib/owner-auth-context"
+import { OwnerBrandingProvider } from "@/owner/lib/owner-branding-context"
 import { GymsProvider } from "@/shared/lib/gyms-context"
 import { TransactionsProvider } from "@/shared/lib/transactions-context"
 
@@ -25,12 +26,14 @@ createRoot(document.getElementById("root")!).render(
               <AdminAuthProvider>
                 <AdminOwnersProvider>
                   <OwnerAuthProvider>
-                    <ThemeProvider>
-                      <ToastProvider>
-                        <App />
-                        <Toaster />
-                      </ToastProvider>
-                    </ThemeProvider>
+                    <OwnerBrandingProvider>
+                      <ThemeProvider>
+                        <ToastProvider>
+                          <App />
+                          <Toaster />
+                        </ToastProvider>
+                      </ThemeProvider>
+                    </OwnerBrandingProvider>
                   </OwnerAuthProvider>
                 </AdminOwnersProvider>
               </AdminAuthProvider>

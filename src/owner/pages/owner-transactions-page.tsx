@@ -12,6 +12,7 @@ import {
   type OwnerTransactionApiItem,
 } from "@/lib/owner-api"
 import { useBookings } from "@/lib/bookings-context"
+import { OwnerWorkspaceHero } from "@/owner/components/layout/owner-workspace-hero"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { TransactionsManager } from "@/shared/components/transactions/transactions-manager"
 import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
@@ -67,7 +68,9 @@ function mapApiTransactionToTransaction(
 export function OwnerTransactionsPage() {
   const { owner } = useOwnerAuth()
   const { setBookingStatus } = useBookings()
-  const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>([])
+  const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>(
+    []
+  )
 
   useEffect(() => {
     if (!owner?.token) {
@@ -171,16 +174,12 @@ export function OwnerTransactionsPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-medium text-primary">Transactions</p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-          Bookings at your venues
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Search, filter, and update the status of bookings made at your
-          gyms.
-        </p>
-      </div>
+      <OwnerWorkspaceHero
+        eyebrow="Transactions"
+        title="Booking operations"
+        description="Review submitted receipts, filter bookings by venue or court, and confirm or reject payments inside your own branded workspace."
+        meta="Transactions"
+      />
 
       <TransactionsManager
         transactions={visibleTransactions}

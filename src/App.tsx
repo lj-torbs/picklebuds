@@ -11,6 +11,7 @@ import { RequireAuth } from "@/components/auth/require-auth"
 import { OwnerShell } from "@/owner/components/layout/owner-shell"
 import { RequireOwnerAuth } from "@/owner/components/require-owner-auth"
 import { OwnerDashboardPage } from "@/owner/pages/owner-dashboard-page"
+import { OwnerConfigurationPage } from "@/owner/pages/owner-configuration-page"
 import { OwnerGymFormPage } from "@/owner/pages/owner-gym-form-page"
 import { OwnerGymsPage } from "@/owner/pages/owner-gyms-page"
 import { OwnerLoginPage } from "@/owner/pages/owner-login-page"
@@ -63,6 +64,7 @@ export function App() {
           <Route path="gyms/new" element={<OwnerGymFormPage />} />
           <Route path="gyms/:gymId/edit" element={<OwnerGymFormPage />} />
           <Route path="transactions" element={<OwnerTransactionsPage />} />
+          <Route path="configuration" element={<OwnerConfigurationPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

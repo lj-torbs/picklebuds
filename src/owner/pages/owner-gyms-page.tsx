@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Plus } from "lucide-react"
 
+import { OwnerWorkspaceHero } from "@/owner/components/layout/owner-workspace-hero"
 import { CourtFormSheet } from "@/shared/components/gyms/court-form-sheet"
 import { GymCard } from "@/shared/components/gyms/gym-card"
 import { Button } from "@/components/ui/button"
@@ -89,7 +90,12 @@ export function OwnerGymsPage() {
 
     try {
       const response = editingCourt
-        ? await updateOwnerCourtWithApi(owner.token, activeGymId, editingCourt.id, values)
+        ? await updateOwnerCourtWithApi(
+            owner.token,
+            activeGymId,
+            editingCourt.id,
+            values
+          )
         : await createOwnerCourtWithApi(owner.token, activeGymId, values)
       replaceGym(mapOwnerVenueToGym(response))
       toast.add({
@@ -114,7 +120,11 @@ export function OwnerGymsPage() {
 
     const nextStatus = gym.status === "active" ? "inactive" : "active"
     try {
-      const response = await setOwnerVenueStatusWithApi(owner.token, gym.id, nextStatus)
+      const response = await setOwnerVenueStatusWithApi(
+        owner.token,
+        gym.id,
+        nextStatus
+      )
       replaceGym(mapOwnerVenueToGym(response))
       toast.add({
         title: nextStatus === "active" ? "Gym activated" : "Gym deactivated",
@@ -136,7 +146,8 @@ export function OwnerGymsPage() {
       return
     }
 
-    const nextStatus = court.status === "available" ? "maintenance" : "available"
+    const nextStatus =
+      court.status === "available" ? "maintenance" : "available"
     try {
       const response = await setOwnerCourtStatusWithApi(
         owner.token,
@@ -166,7 +177,11 @@ export function OwnerGymsPage() {
     }
 
     try {
-      const response = await deleteOwnerCourtWithApi(owner.token, gymId, court.id)
+      const response = await deleteOwnerCourtWithApi(
+        owner.token,
+        gymId,
+        court.id
+      )
       replaceGym(mapOwnerVenueToGym(response))
       toast.add({
         title: "Court removed",
@@ -185,20 +200,18 @@ export function OwnerGymsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-sm font-medium text-primary">Venues</p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight">My gyms</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Manage your courts, pricing, payment methods, and booking
-            availability across every venue you operate.
-          </p>
-        </div>
-        <Button type="button" onClick={() => navigate("/owner/gyms/new")}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add gym
-        </Button>
-      </div>
+      <OwnerWorkspaceHero
+        eyebrow="Venues"
+        title="Venue management"
+        description="Manage courts, payment methods, whole gym access, and booking availability across every venue in your owner workspace."
+        meta="Venue management"
+        actions={
+          <Button type="button" onClick={() => navigate("/owner/gyms/new")}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add gym
+          </Button>
+        }
+      />
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
@@ -226,7 +239,9 @@ export function OwnerGymsPage() {
             <GymCard
               key={gym.id}
               gym={gym}
-              onEditGym={(current) => navigate(`/owner/gyms/${current.id}/edit`)}
+              onEditGym={(current) =>
+                navigate(`/owner/gyms/${current.id}/edit`)
+              }
               onToggleGymStatus={handleToggleGymStatus}
               onAddCourt={openAddCourt}
               onEditCourt={(gymId, court) => {

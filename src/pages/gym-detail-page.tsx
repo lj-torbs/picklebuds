@@ -1391,9 +1391,9 @@ export function GymDetailPage() {
                             selection.court.openPlayCapacity ? (
                               <p className="mt-1 text-xs text-primary">
                                 1 seat at{" "}
-                                {getOpenPlayPricePerPlayer(
-                                  selection.court
-                                ))}
+                                {formatCurrency(
+                                  getOpenPlayPricePerPlayer(selection.court)
+                                )}{" "}
                                 per slot · projected occupancy updates in the
                                 calendar
                               </p>
@@ -1773,4 +1773,3 @@ export function GymDetailPage() {
     </main>
   )
 }
-
