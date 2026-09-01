@@ -46,7 +46,7 @@ export function TransactionTable({
                 <div className="grid gap-1">
                   <span className="font-medium">{transaction.id}</span>
                   <span className="text-xs text-muted-foreground">
-                    {transaction.referenceNumber}
+                    {transaction.paymentReceipt?.referenceNumber ?? "No reference"}
                   </span>
                 </div>
               </td>
@@ -66,7 +66,7 @@ export function TransactionTable({
                 <div className="grid gap-1">
                   <span>{transaction.date}</span>
                   <span className="text-xs text-muted-foreground">
-                    {transaction.time}
+                    {transaction.slots.join(", ")}
                   </span>
                 </div>
               </td>

@@ -136,11 +136,13 @@ export function PasaloPanel() {
 
     const reader = new FileReader()
     reader.onload = () => {
-      if (typeof reader.result === "string") {
+      const result = reader.result
+
+      if (typeof result === "string") {
         setClaimDraft((current) => ({
           ...current,
           fileName: file.name,
-          imageUrl: reader.result,
+          imageUrl: result,
         }))
       }
     }

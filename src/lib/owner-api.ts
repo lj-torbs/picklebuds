@@ -4,6 +4,10 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ??
   "http://127.0.0.1:8001/api"
 
+function hasDetailPayload(payload: unknown): payload is { detail?: string } {
+  return typeof payload === "object" && payload !== null && "detail" in payload
+}
+
 export type OwnerDashboardApiStats = {
   total_revenue: number
   pending_count: number
@@ -110,10 +114,10 @@ async function parseApiResponse<T>(response: Response, fallback: string) {
 
   if (!response.ok) {
     throw new AuthApiError(
-      (payload && "detail" in payload && payload.detail) || fallback,
+      (hasDetailPayload(payload) && payload.detail) || fallback,
       response.status,
       undefined,
-      payload && "detail" in payload ? payload.detail : undefined
+      hasDetailPayload(payload) ? payload.detail : undefined
     )
   }
 

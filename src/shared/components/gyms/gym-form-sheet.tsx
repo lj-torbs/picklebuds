@@ -43,6 +43,7 @@ const emptyValues: GymFormValues = {
   phone: "",
   imageUrl: "",
   status: "active",
+  paymentOptions: [],
 }
 
 type PaymentSetupDraft = {
