@@ -41,12 +41,14 @@ export function TransactionsManager({
   enableReporting = false,
   onSetStatus,
   onRefund,
+  highlightedTransactionId,
 }: {
   transactions: Transaction[]
   searchPlaceholder?: string
   enableReporting?: boolean
   onSetStatus: (id: string, status: TransactionStatus) => void | Promise<void>
   onRefund: (id: string) => void | Promise<void>
+  highlightedTransactionId?: string | null
 }) {
   const toast = useToast()
 
@@ -389,10 +391,11 @@ export function TransactionsManager({
       </div>
 
       <div className="grid gap-2">
-        <TransactionTable
-          transactions={filteredTransactions}
-          onView={(transaction) => setSelectedTransactionId(transaction.id)}
-        />
+          <TransactionTable
+            transactions={filteredTransactions}
+            highlightedTransactionId={highlightedTransactionId}
+            onView={(transaction) => setSelectedTransactionId(transaction.id)}
+          />
       </div>
 
       <TransactionDetailSheet

@@ -25,6 +25,11 @@ import {
 } from "@/lib/owner-api"
 import { OwnerWorkspaceHero } from "@/owner/components/layout/owner-workspace-hero"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
+import {
+  mapOwnerPaymentMethodToGymPayment,
+  paymentMethodMatchesGymPayment,
+  useOwnerPaymentMethods,
+} from "@/owner/lib/owner-payment-methods-context"
 import { mapOwnerVenueToGym } from "@/owner/lib/owner-venue-mappers"
 import { RentalGearEditor } from "@/shared/components/gyms/rental-gear-editor"
 import type { RentalItemDraft } from "@/shared/components/gyms/rental-gear-utils"
@@ -40,7 +45,6 @@ import {
 import type {
   GymPaymentSetup,
   GymStatus,
-  PaymentProvider,
   RentalItem,
 } from "@/shared/lib/gyms-context"
 import type { Gym } from "@/shared/lib/gyms-context"
@@ -53,36 +57,11 @@ type DetailsDraft = {
   status: GymStatus
 }
 
-type PaymentSetupDraft = {
-  provider: PaymentProvider
-  accountName: string
-  accountNumber: string
-  instructions: string
-  qrCodeImageUrl: string
-  qrCodeFileName: string
-}
-
 type WholeGymDraft = {
   enabled: boolean
   pricePerHour: string
   notes: string
 }
-
-const emptyPaymentSetupDraft: PaymentSetupDraft = {
-  provider: "GCash",
-  accountName: "",
-  accountNumber: "",
-  instructions: "",
-  qrCodeImageUrl: "",
-  qrCodeFileName: "",
-}
-
-const paymentProviderOptions: PaymentProvider[] = [
-  "GCash",
-  "Bank Transfer",
-  "Maya",
-  "Other",
-]
 
 const steps = [
   {
@@ -97,7 +76,7 @@ const steps = [
     title: "Payment methods",
     shortTitle: "Payments",
     description:
-      "Where players send payment, and the QR codes they scan at checkout.",
+      "Choose from reusable owner payment methods for this venue and its courts.",
     icon: CreditCard,
   },
   {
@@ -135,28 +114,12 @@ function readImageFile(
   reader.readAsDataURL(file)
 }
 
-function paymentIsComplete(option: PaymentSetupDraft) {
-  return Boolean(
-    option.accountName.trim() &&
-    option.accountNumber.trim() &&
-    option.qrCodeImageUrl
-  )
-}
-
-function paymentIsEmpty(option: PaymentSetupDraft) {
-  return !(
-    option.accountName.trim() ||
-    option.accountNumber.trim() ||
-    option.qrCodeImageUrl ||
-    option.instructions.trim()
-  )
-}
-
 export function OwnerGymFormPage() {
   const { gymId } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
   const { owner } = useOwnerAuth()
+  const { activePaymentMethods } = useOwnerPaymentMethods()
   const [availableGyms, setAvailableGyms] = useState<Gym[]>([])
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [hasLoadedGyms, setHasLoadedGyms] = useState(false)
@@ -219,17 +182,8 @@ export function OwnerGymFormPage() {
     status: editingGym?.status ?? "active",
   })
 
-  const [paymentOptions, setPaymentOptions] = useState<PaymentSetupDraft[]>(
-    editingGym?.paymentOptions?.length
-      ? editingGym.paymentOptions.map((option) => ({
-          provider: option.provider,
-          accountName: option.accountName,
-          accountNumber: option.accountNumber,
-          instructions: option.instructions ?? "",
-          qrCodeImageUrl: option.qrCodeImageUrl,
-          qrCodeFileName: option.qrCodeFileName,
-        }))
-      : [{ ...emptyPaymentSetupDraft }]
+  const [paymentOptions, setPaymentOptions] = useState<GymPaymentSetup[]>(
+    editingGym?.paymentOptions ?? []
   )
 
   const [wholeGym, setWholeGym] = useState<WholeGymDraft>({
@@ -268,18 +222,7 @@ export function OwnerGymFormPage() {
       imageUrl: editingGym.imageUrl ?? "",
       status: editingGym.status,
     })
-    setPaymentOptions(
-      editingGym.paymentOptions.length > 0
-        ? editingGym.paymentOptions.map((option) => ({
-            provider: option.provider,
-            accountName: option.accountName,
-            accountNumber: option.accountNumber,
-            instructions: option.instructions ?? "",
-            qrCodeImageUrl: option.qrCodeImageUrl,
-            qrCodeFileName: option.qrCodeFileName,
-          }))
-        : [{ ...emptyPaymentSetupDraft }]
-    )
+    setPaymentOptions(editingGym.paymentOptions)
     setWholeGym({
       enabled: editingGym.wholeGymBooking?.enabled ?? false,
       pricePerHour: editingGym.wholeGymBooking?.pricePerHour
@@ -315,10 +258,7 @@ export function OwnerGymFormPage() {
   }
   const detailsAreValid = !detailsErrors.name && !detailsErrors.address
 
-  const droppedPayments = paymentOptions.filter(
-    (option) => !paymentIsComplete(option) && !paymentIsEmpty(option)
-  ).length
-  const completePayments = paymentOptions.filter(paymentIsComplete).length
+  const completePayments = paymentOptions.length
 
   const droppedRentals = rentalItems.filter(
     (item) => !rentalDraftIsComplete(item) && !rentalDraftIsEmpty(item)
@@ -333,15 +273,23 @@ export function OwnerGymFormPage() {
     wholeGymPrice > 0 &&
     normalizedWholeGymSlots.length > 0
 
-  function updatePaymentOption(
-    index: number,
-    update: Partial<PaymentSetupDraft>
-  ) {
-    setPaymentOptions((current) =>
-      current.map((option, currentIndex) =>
-        currentIndex === index ? { ...option, ...update } : option
+  function toggleAssignedPaymentMethod(methodId: string) {
+    const method = activePaymentMethods.find((item) => item.id === methodId)
+    if (!method) {
+      return
+    }
+
+    setPaymentOptions((current) => {
+      const assigned = current.some((option) =>
+        paymentMethodMatchesGymPayment(method, option)
       )
-    )
+
+      return assigned
+        ? current.filter(
+            (option) => !paymentMethodMatchesGymPayment(method, option)
+          )
+        : [...current, mapOwnerPaymentMethodToGymPayment(method)]
+    })
   }
 
   function goToStep(nextIndex: number) {
@@ -367,20 +315,20 @@ export function OwnerGymFormPage() {
       return
     }
 
-    const normalizedPaymentOptions: GymPaymentSetup[] = paymentOptions
-      .filter(paymentIsComplete)
-      .map((option) => ({
+    const normalizedPaymentOptions: GymPaymentSetup[] = paymentOptions.map(
+      (option) => ({
         provider: option.provider,
         accountName: option.accountName.trim(),
         accountNumber: option.accountNumber.trim(),
-        instructions: option.instructions.trim() || undefined,
+        instructions: option.instructions?.trim() || undefined,
         qrCodeImageUrl: option.qrCodeImageUrl,
         qrCodeFileName:
           option.qrCodeFileName ||
           `${details.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${option.provider
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")}-qr.png`,
-      }))
+      })
+    )
 
     const normalizedRentalItems: RentalItem[] = rentalItems
       .filter(rentalDraftIsComplete)
@@ -463,7 +411,7 @@ export function OwnerGymFormPage() {
           description={
             editingGym
               ? "Update venue details, payment collection, and whole gym availability inside your branded owner workspace."
-              : "Set up a new venue, connect payment methods, and configure exclusive venue booking before courts are added."
+              : "Set up a new venue, assign saved payment methods, and configure exclusive venue booking before courts are added."
           }
           meta={editingGym ? "Edit venue" : "New venue"}
         />
@@ -727,36 +675,119 @@ export function OwnerGymFormPage() {
 
         {stepIndex === 1 ? (
           <div className="grid gap-4">
-            {droppedPayments > 0 ? (
-              <p className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-                <TriangleAlert
-                  className="mt-px size-4 shrink-0"
-                  aria-hidden="true"
-                />
-                <span>
-                  {droppedPayments} payment{" "}
-                  {droppedPayments === 1 ? "method is" : "methods are"} missing
-                  an account name, account number, or QR code, and{" "}
-                  {droppedPayments === 1 ? "it won't" : "they won't"} be saved.
-                </span>
-              </p>
-            ) : null}
-
-            <div className="grid gap-4 xl:grid-cols-[repeat(2,minmax(0,1fr))]">
-              {paymentOptions.map((paymentSetup, index) => (
-                <div
-                  key={index}
-                  className="grid min-w-0 content-start gap-3 rounded-lg border bg-background p-4"
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    Assign saved payment methods
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Payment account details are managed separately, then reused
+                    here for this venue and its courts.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/owner/payment-methods")}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium">
-                      Payment option {index + 1}
-                    </span>
-                    {paymentOptions.length > 1 ? (
+                  Manage payment methods
+                </Button>
+              </div>
+            </div>
+
+            {activePaymentMethods.length === 0 ? (
+              <div className="grid gap-3 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                <p>
+                  No active reusable payment methods yet. Add one before
+                  assigning payment collection to this gym.
+                </p>
+                <Button
+                  type="button"
+                  className="w-fit"
+                  onClick={() => navigate("/owner/payment-methods")}
+                >
+                  Add reusable method
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {activePaymentMethods.map((method) => {
+                  const assigned = paymentOptions.some((option) =>
+                    paymentMethodMatchesGymPayment(method, option)
+                  )
+
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => toggleAssignedPaymentMethod(method.id)}
+                      className={cn(
+                        "grid gap-3 rounded-lg border bg-background p-4 text-left transition hover:border-primary/50 hover:bg-primary/5",
+                        assigned &&
+                          "border-primary bg-primary/5 ring-1 ring-primary/25"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {method.displayName}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {method.provider} / {method.accountName}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {method.accountNumber}
+                          </p>
+                        </div>
+                        {assigned ? (
+                          <span className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">
+                            Assigned
+                          </span>
+                        ) : (
+                          <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                            Available
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <CreditCard className="size-3.5" aria-hidden="true" />
+                        QR: {method.qrCodeFileName}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">
+                Assigned to this venue ({paymentOptions.length})
+              </p>
+              {paymentOptions.length === 0 ? (
+                <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
+                  No payment methods assigned. Players will not see a payment QR
+                  at checkout for this venue.
+                </p>
+              ) : (
+                <div className="grid gap-2">
+                  {paymentOptions.map((paymentSetup, index) => (
+                    <div
+                      key={`${paymentSetup.provider}-${paymentSetup.accountNumber}-${index}`}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">
+                          {paymentSetup.provider} / {paymentSetup.accountName}
+                        </p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {paymentSetup.accountNumber}
+                        </p>
+                      </div>
                       <Button
                         type="button"
-                        size="sm"
                         variant="ghost"
+                        size="sm"
                         onClick={() =>
                           setPaymentOptions((current) =>
                             current.filter(
@@ -768,128 +799,11 @@ export function OwnerGymFormPage() {
                         <Trash2 className="size-4" aria-hidden="true" />
                         Remove
                       </Button>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor={`payment-provider-${index}`}>
-                      Payment mode
-                    </Label>
-                    <select
-                      id={`payment-provider-${index}`}
-                      value={paymentSetup.provider}
-                      onChange={(event) =>
-                        updatePaymentOption(index, {
-                          provider: event.target.value as PaymentProvider,
-                        })
-                      }
-                      className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      {paymentProviderOptions.map((provider) => (
-                        <option key={provider} value={provider}>
-                          {provider}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor={`payment-account-name-${index}`}>
-                      Account name
-                    </Label>
-                    <Input
-                      id={`payment-account-name-${index}`}
-                      value={paymentSetup.accountName}
-                      onChange={(event) =>
-                        updatePaymentOption(index, {
-                          accountName: event.target.value,
-                        })
-                      }
-                      placeholder="Name shown on the QR account"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor={`payment-account-number-${index}`}>
-                      Account number or handle
-                    </Label>
-                    <Input
-                      id={`payment-account-number-${index}`}
-                      value={paymentSetup.accountNumber}
-                      onChange={(event) =>
-                        updatePaymentOption(index, {
-                          accountNumber: event.target.value,
-                        })
-                      }
-                      placeholder="e.g. 0917..., bank account, or payment handle"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor={`payment-qr-${index}`}>
-                      Payment QR code
-                    </Label>
-                    <Input
-                      id={`payment-qr-${index}`}
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) =>
-                        readImageFile(event.target.files?.[0], (dataUrl) =>
-                          updatePaymentOption(index, {
-                            qrCodeFileName:
-                              event.target.files?.[0]?.name ?? "qr-code.png",
-                            qrCodeImageUrl: dataUrl,
-                          })
-                        )
-                      }
-                    />
-                    {paymentSetup.qrCodeImageUrl ? (
-                      <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
-                        <img
-                          src={paymentSetup.qrCodeImageUrl}
-                          alt="Payment QR code preview"
-                          className="mx-auto aspect-square w-36 rounded-md border bg-white object-contain p-2"
-                        />
-                        <span className="text-center text-xs text-muted-foreground">
-                          {paymentSetup.qrCodeFileName}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor={`payment-instructions-${index}`}>
-                      Payment instructions
-                    </Label>
-                    <textarea
-                      id={`payment-instructions-${index}`}
-                      value={paymentSetup.instructions}
-                      onChange={(event) =>
-                        updatePaymentOption(index, {
-                          instructions: event.target.value,
-                        })
-                      }
-                      placeholder="Optional note for players before they upload proof."
-                      className="min-h-24 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    />
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              onClick={() =>
-                setPaymentOptions((current) => [
-                  ...current,
-                  { ...emptyPaymentSetupDraft },
-                ])
-              }
-            >
-              Add payment method
-            </Button>
           </div>
         ) : null}
 

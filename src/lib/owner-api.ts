@@ -317,6 +317,23 @@ export async function setOwnerVenueStatusWithApi(
   )
 }
 
+export async function deleteOwnerVenueWithApi(
+  token: string,
+  venuePublicId: string
+) {
+  const response = await fetch(`${API_BASE_URL}/owners/venues/${venuePublicId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  return parseApiResponse<{ detail?: string }>(
+    response,
+    "Unable to delete venue right now."
+  )
+}
+
 export async function createOwnerCourtWithApi(
   token: string,
   venuePublicId: string,

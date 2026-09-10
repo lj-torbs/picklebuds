@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowLeft,
-  Bell,
   Building2,
+  CalendarDays,
   CalendarCheck,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   DollarSign,
   ImageUp,
@@ -27,6 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
@@ -52,6 +55,7 @@ import {
   CourtStatusBadge,
   GymStatusBadge,
 } from "@/shared/components/gyms/gym-status-badge"
+import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
 import type {
   BookingRental,
   Gym,
@@ -81,13 +85,75 @@ type WholeGymBookingSelection = {
   slots: string[]
 }
 
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function parseLocalDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number)
+
+  if (!year || !month || !day) {
+    return new Date()
+  }
+
+  return new Date(year, month - 1, day)
+}
+
+function addDaysToDateValue(value: string, days: number) {
+  const date = parseLocalDate(value)
+  date.setDate(date.getDate() + days)
+  return formatLocalDate(date)
+}
+
+function parseSlotStartMinutes(slotLabel: string) {
+  const startLabel = slotLabel.split(" - ")[0]?.trim() ?? slotLabel.trim()
+  const match = startLabel.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i)
+
+  if (!match) {
+    return null
+  }
+
+  let hours = Number(match[1])
+  const minutes = Number(match[2])
+  const suffix = match[3]?.toUpperCase()
+
+  if (suffix === "PM" && hours !== 12) {
+    hours += 12
+  }
+
+  if (suffix === "AM" && hours === 12) {
+    hours = 0
+  }
+
+  return hours * 60 + minutes
+}
+
+function isPastSlotStart(day: string, slotLabel: string) {
+  const today = formatLocalDate(new Date())
+  if (day !== today) {
+    return false
+  }
+
+  const startMinutes = parseSlotStartMinutes(slotLabel)
+  if (startMinutes === null) {
+    return false
+  }
+
+  const now = new Date()
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  return startMinutes <= currentMinutes
+}
+
 function buildWeek(startingFrom = new Date()) {
   return Array.from({ length: DAYS_IN_VIEW }, (_, index) => {
     const date = new Date(startingFrom)
     date.setDate(date.getDate() + index)
 
     return {
-      value: date.toISOString().slice(0, 10),
+      value: formatLocalDate(date),
       label: date.toLocaleDateString(undefined, { weekday: "short" }),
       sublabel: date.toLocaleDateString(undefined, {
         month: "short",
@@ -166,7 +232,7 @@ export function GymDetailPage() {
     getRentedQuantity,
   } = useBookings()
   const { addTransaction } = useTransactions()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const toast = useToast()
 
   const fallbackGym = useMemo(
@@ -179,8 +245,13 @@ export function GymDetailPage() {
   const [isLoadingVenue, setIsLoadingVenue] = useState(true)
   const [liveVenueError, setLiveVenueError] = useState<string | null>(null)
 
-  const week = useMemo(() => buildWeek(), [])
-  const weekStart = week[0]?.value ?? new Date().toISOString().slice(0, 10)
+  const todayValue = useMemo(() => formatLocalDate(new Date()), [])
+  const [bookingWindowStart, setBookingWindowStart] = useState(todayValue)
+  const week = useMemo(
+    () => buildWeek(parseLocalDate(bookingWindowStart)),
+    [bookingWindowStart]
+  )
+  const weekStart = week[0]?.value ?? formatLocalDate(new Date())
 
   const gym = remoteGym ?? fallbackGym
 
@@ -209,6 +280,17 @@ export function GymDetailPage() {
     Record<string, number>
   >({})
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false)
+
+  function updateBookingWindow(nextDate: string) {
+    const normalizedDate = nextDate < todayValue ? todayValue : nextDate
+    setBookingWindowStart(normalizedDate)
+    setBookingSelections([])
+    setWholeGymSelections([])
+  }
+
+  function shiftBookingWindow(days: number) {
+    updateBookingWindow(addDaysToDateValue(bookingWindowStart, days))
+  }
 
   useEffect(() => {
     if (!gymId) {
@@ -385,6 +467,10 @@ export function GymDetailPage() {
       return "closed"
     }
 
+    if (isPastSlotStart(day, time)) {
+      return "closed"
+    }
+
     if (
       bookingSelections.some(
         (selection) =>
@@ -409,6 +495,10 @@ export function GymDetailPage() {
     time: string
   ): AvailabilityCellState {
     if (!wholeGymSetup || !wholeGymSetup.availableSlots.includes(time)) {
+      return "closed"
+    }
+
+    if (isPastSlotStart(day, time)) {
       return "closed"
     }
 
@@ -515,6 +605,21 @@ export function GymDetailPage() {
     })
   }
 
+  function handleStaleBookingSession(error: unknown) {
+    if (!(error instanceof AuthApiError) || error.status !== 401) {
+      return false
+    }
+
+    logout()
+    toast.add({
+      title: "Session expired",
+      description: "Please sign in again before submitting your booking.",
+      type: "error",
+    })
+    navigate("/login", { replace: true })
+    return true
+  }
+
   async function handleConfirmBooking() {
     if (!gym || !paymentSetup || !receiptIsComplete || isSubmittingBooking) {
       return
@@ -613,6 +718,10 @@ export function GymDetailPage() {
           })
         }
       } catch (error) {
+        if (handleStaleBookingSession(error)) {
+          return
+        }
+
         if (gymId) {
           void getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
             .then((availability) => {
@@ -718,6 +827,10 @@ export function GymDetailPage() {
           })
         }
       } catch (error) {
+        if (handleStaleBookingSession(error)) {
+          return
+        }
+
         if (gymId) {
           void getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
             .then((availability) => {
@@ -837,7 +950,7 @@ export function GymDetailPage() {
     <main className="min-h-svh bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/booking" className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
@@ -851,13 +964,7 @@ export function GymDetailPage() {
             </span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link
-              to="/notifications"
-              className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-              aria-label="Notifications"
-            >
-              <Bell className="size-4" aria-hidden="true" />
-            </Link>
+            <NotificationBellLink token={user?.token} to="/notifications" />
             <Link
               to="/profile"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
@@ -1198,6 +1305,58 @@ export function GymDetailPage() {
                     </div>
                   </div>
                   <AvailabilityCalendarLegend />
+                </div>
+                <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div className="grid gap-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <CalendarDays
+                        className="size-4 text-primary"
+                        aria-hidden="true"
+                      />
+                      Advanced booking calendar
+                    </div>
+                    <div className="max-w-xs">
+                      <DatePicker
+                        value={bookingWindowStart}
+                        onChange={updateBookingWindow}
+                        placeholder="Choose booking date"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Showing {week[0]?.sublabel} to{" "}
+                      {week[week.length - 1]?.sublabel}. Pick a future date to
+                      check later availability.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={bookingWindowStart <= todayValue}
+                      onClick={() => shiftBookingWindow(-DAYS_IN_VIEW)}
+                    >
+                      <ChevronLeft className="size-4" aria-hidden="true" />
+                      Previous week
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateBookingWindow(todayValue)}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => shiftBookingWindow(DAYS_IN_VIEW)}
+                    >
+                      Next week
+                      <ChevronRight className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
                 </div>
                 {isWholeGymScope && wholeGymSetup ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">

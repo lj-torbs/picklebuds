@@ -2,10 +2,8 @@ import {
   BarChart3,
   Check,
   ChartPie,
-  ImagePlus,
   LayoutDashboard,
   ListChecks,
-  Palette,
   Receipt,
   RefreshCcw,
   Save,
@@ -342,21 +340,25 @@ function WorkspacePreview({
           </div>
 
           <nav className="mt-4 grid gap-1.5">
-            {["Dashboard", "My Gyms", "Transactions", "Configuration"].map(
-              (item, index) => (
-                <div
-                  key={item}
-                  className={cn(
-                    "rounded-md px-2 py-2 text-[11px]",
-                    index === 0
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70"
-                  )}
-                >
-                  {item}
-                </div>
-              )
-            )}
+            {[
+              "Dashboard",
+              "My Gyms",
+              "Payment Methods",
+              "Transactions",
+              "Configuration",
+            ].map((item, index) => (
+              <div
+                key={item}
+                className={cn(
+                  "rounded-md px-2 py-2 text-[11px]",
+                  index === 0
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70"
+                )}
+              >
+                {item}
+              </div>
+            ))}
           </nav>
 
           <div className="mt-auto rounded-md border border-sidebar-border/70 px-2 py-2 text-[10px] text-sidebar-foreground/55">
@@ -505,6 +507,7 @@ export function OwnerConfigurationPage() {
   )
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Draft should reset when the persisted owner branding changes.
     setDraft(branding)
   }, [branding])
 

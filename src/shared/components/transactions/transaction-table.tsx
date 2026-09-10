@@ -5,15 +5,18 @@ import {
   TransactionStatusBadge,
 } from "@/shared/components/transactions/transaction-status-badge"
 import { formatCurrency } from "@/lib/currency"
+import { cn } from "@/lib/utils"
 import type { Transaction } from "@/shared/lib/transactions-context"
 import { Button } from "@/components/ui/button"
 
 export function TransactionTable({
   transactions,
   onView,
+  highlightedTransactionId,
 }: {
   transactions: Transaction[]
   onView: (transaction: Transaction) => void
+  highlightedTransactionId?: string | null
 }) {
   if (transactions.length === 0) {
     return (
@@ -41,8 +44,22 @@ export function TransactionTable({
           </tr>
         </thead>
         <tbody className="divide-y">
-          {transactions.map((transaction) => (
-            <tr key={transaction.id} className="hover:bg-muted/10">
+          {transactions.map((transaction) => {
+            const isHighlighted = highlightedTransactionId === transaction.id
+            return (
+            <tr
+              key={transaction.id}
+              className={cn(
+                "transition-colors hover:bg-muted/10",
+                transaction.status === "cancelled" && "bg-destructive/5",
+                isHighlighted &&
+                  transaction.status !== "cancelled" &&
+                  "bg-primary/15 ring-2 ring-inset ring-primary/50",
+                isHighlighted &&
+                  transaction.status === "cancelled" &&
+                  "bg-destructive/15 ring-2 ring-inset ring-destructive/50"
+              )}
+            >
               <td className="px-4 py-2.5">
                 <div className="grid gap-1">
                   <span className="font-medium">{transaction.id}</span>
@@ -95,7 +112,8 @@ export function TransactionTable({
                 </Button>
               </td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>

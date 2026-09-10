@@ -15,6 +15,8 @@ import { OwnerConfigurationPage } from "@/owner/pages/owner-configuration-page"
 import { OwnerGymFormPage } from "@/owner/pages/owner-gym-form-page"
 import { OwnerGymsPage } from "@/owner/pages/owner-gyms-page"
 import { OwnerLoginPage } from "@/owner/pages/owner-login-page"
+import { OwnerNotificationsPage } from "@/owner/pages/owner-notifications-page"
+import { OwnerPaymentMethodsPage } from "@/owner/pages/owner-payment-methods-page"
 import { OwnerTransactionsPage } from "@/owner/pages/owner-transactions-page"
 import { BookingPage } from "@/pages/booking-page"
 import { ForgotPasswordPage } from "@/pages/forgot-password-page"
@@ -52,7 +54,10 @@ export function App() {
           <Route path="transactions" element={<AdminTransactionsPage />} />
           <Route path="gyms" element={<AdminGymsPage />} />
           <Route path="owners" element={<AdminOwnersPage />} />
-          <Route path="users" element={<Navigate to="/admin/owners" replace />} />
+          <Route
+            path="users"
+            element={<Navigate to="/admin/owners" replace />}
+          />
         </Route>
       </Route>
       <Route path="/owner/login" element={<OwnerLoginPage />} />
@@ -63,7 +68,9 @@ export function App() {
           <Route path="gyms" element={<OwnerGymsPage />} />
           <Route path="gyms/new" element={<OwnerGymFormPage />} />
           <Route path="gyms/:gymId/edit" element={<OwnerGymFormPage />} />
+          <Route path="payment-methods" element={<OwnerPaymentMethodsPage />} />
           <Route path="transactions" element={<OwnerTransactionsPage />} />
+          <Route path="notifications" element={<OwnerNotificationsPage />} />
           <Route path="configuration" element={<OwnerConfigurationPage />} />
         </Route>
       </Route>

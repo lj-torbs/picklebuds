@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 
 import {
   approveBookingPaymentWithApi,
@@ -12,7 +13,6 @@ import {
   type OwnerTransactionApiItem,
 } from "@/lib/owner-api"
 import { useBookings } from "@/lib/bookings-context"
-import { OwnerWorkspaceHero } from "@/owner/components/layout/owner-workspace-hero"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { TransactionsManager } from "@/shared/components/transactions/transactions-manager"
 import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
@@ -68,9 +68,13 @@ function mapApiTransactionToTransaction(
 export function OwnerTransactionsPage() {
   const { owner } = useOwnerAuth()
   const { setBookingStatus } = useBookings()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>(
     []
   )
+  const [highlightedTransactionId, setHighlightedTransactionId] = useState<
+    string | null
+  >(null)
 
   useEffect(() => {
     if (!owner?.token) {
@@ -103,6 +107,28 @@ export function OwnerTransactionsPage() {
     [remoteTransactions]
   )
   const visibleTransactions = remoteTransactions
+  const focusTransactionId = searchParams.get("focus")
+
+  useEffect(() => {
+    if (!focusTransactionId) {
+      return
+    }
+
+    setHighlightedTransactionId(focusTransactionId)
+    const timeoutId = window.setTimeout(() => {
+      setHighlightedTransactionId(null)
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current)
+          next.delete("focus")
+          return next
+        },
+        { replace: true }
+      )
+    }, 3000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [focusTransactionId, setSearchParams])
 
   async function handleSetStatus(id: string, status: TransactionStatus) {
     const isLiveTransaction = liveTransactionIds.has(id) && !!owner?.token
@@ -174,16 +200,10 @@ export function OwnerTransactionsPage() {
 
   return (
     <div className="grid gap-6">
-      <OwnerWorkspaceHero
-        eyebrow="Transactions"
-        title="Booking operations"
-        description="Review submitted receipts, filter bookings by venue or court, and confirm or reject payments inside your own branded workspace."
-        meta="Transactions"
-      />
-
       <TransactionsManager
         transactions={visibleTransactions}
         enableReporting
+        highlightedTransactionId={highlightedTransactionId}
         onSetStatus={handleSetStatus}
         onRefund={handleRefund}
       />

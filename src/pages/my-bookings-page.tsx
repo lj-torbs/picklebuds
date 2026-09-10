@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import {
-  Bell,
   BadgeDollarSign,
   CalendarCheck,
   CalendarDays,
@@ -29,6 +28,8 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
+import { AuthApiError } from "@/lib/auth-api"
+import { cancelPlayerBookingWithApi } from "@/lib/booking-api"
 import type {
   Booking,
   BookingStatus,
@@ -38,6 +39,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
 import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
 import { getRentalTotal } from "@/shared/lib/gyms-context"
 
 const rescheduleSlots = [
@@ -78,6 +80,12 @@ export function MyBookingsPage() {
   const [draftDate, setDraftDate] = useState("")
   const [draftSlots, setDraftSlots] = useState<string[]>([])
   const [cancelCandidateId, setCancelCandidateId] = useState<string | null>(
+    null
+  )
+  const [pasaloFirstCancelId, setPasaloFirstCancelId] = useState<string | null>(
+    null
+  )
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(
     null
   )
   const [pasaloBookingId, setPasaloBookingId] = useState<string | null>(null)
@@ -134,6 +142,8 @@ export function MyBookingsPage() {
     setPasaloPrice(String(Math.max(1, booking.slots.length * 12)))
     setPasaloNote(booking.pasalo?.note ?? "")
     setEditingBookingId(null)
+    setPasaloFirstCancelId(null)
+    setCancelCandidateId(null)
   }
 
   function savePasaloOffer(booking: Booking) {
@@ -162,32 +172,78 @@ export function MyBookingsPage() {
     })
   }
 
-  function requestCancel(bookingId: string) {
-    setCancelCandidateId(bookingId)
+  function canOfferPasaloBeforeCancel(booking: Booking) {
+    const pasaloStatus = booking.pasalo?.status ?? "none"
+    return (
+      booking.bookingType === "private" &&
+      booking.status === "confirmed" &&
+      (pasaloStatus === "none" || pasaloStatus === "cancelled")
+    )
+  }
+
+  function requestCancel(booking: Booking) {
+    if (canOfferPasaloBeforeCancel(booking)) {
+      setPasaloFirstCancelId(booking.id)
+      setCancelCandidateId(null)
+      return
+    }
+
+    setCancelCandidateId(booking.id)
   }
 
   function dismissCancel() {
     setCancelCandidateId(null)
+    setPasaloFirstCancelId(null)
   }
 
-  function confirmCancel(bookingId: string) {
-    cancelBookingInStore(bookingId)
-    setCancelCandidateId(null)
-    if (editingBookingId === bookingId) {
-      setEditingBookingId(null)
+  function proceedToActualCancel(bookingId: string) {
+    setPasaloFirstCancelId(null)
+    setCancelCandidateId(bookingId)
+  }
+
+  async function confirmCancel(bookingId: string) {
+    setCancellingBookingId(bookingId)
+
+    try {
+      if (user?.token) {
+        try {
+          await cancelPlayerBookingWithApi(user.token, bookingId)
+        } catch (error) {
+          if (!(error instanceof AuthApiError) || error.status !== 404) {
+            throw error
+          }
+          // Prototype seed bookings may not exist in the live database.
+        }
+      }
+
+      cancelBookingInStore(bookingId)
+      setCancelCandidateId(null)
+      setPasaloFirstCancelId(null)
+      if (editingBookingId === bookingId) {
+        setEditingBookingId(null)
+      }
+      toast.add({
+        title: "Booking cancelled",
+        description: `Booking ${bookingId} has been cancelled.`,
+        type: "success",
+      })
+    } catch (error) {
+      toast.add({
+        title: "Unable to cancel booking",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    } finally {
+      setCancellingBookingId(null)
     }
-    toast.add({
-      title: "Booking cancelled",
-      description: `Booking ${bookingId} has been cancelled.`,
-      type: "success",
-    })
   }
 
   return (
     <main className="min-h-svh bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/booking" className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
@@ -201,13 +257,7 @@ export function MyBookingsPage() {
             </span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link
-              to="/notifications"
-              className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-              aria-label="Notifications"
-            >
-              <Bell className="size-4" aria-hidden="true" />
-            </Link>
+            <NotificationBellLink token={user?.token} to="/notifications" />
             <Link
               to="/profile"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
@@ -248,11 +298,14 @@ export function MyBookingsPage() {
                   draftDate={draftDate}
                   draftSlots={draftSlots}
                   isConfirmingCancel={cancelCandidateId === booking.id}
+                  isPasaloFirstCancel={pasaloFirstCancelId === booking.id}
+                  isCancelling={cancellingBookingId === booking.id}
                   isOfferingPasalo={pasaloBookingId === booking.id}
                   pasaloPrice={pasaloPrice}
                   pasaloNote={pasaloNote}
-                  onRequestCancel={() => requestCancel(booking.id)}
+                  onRequestCancel={() => requestCancel(booking)}
                   onConfirmCancel={() => confirmCancel(booking.id)}
+                  onProceedCancel={() => proceedToActualCancel(booking.id)}
                   onDismissCancel={dismissCancel}
                   onEdit={() => startReschedule(booking)}
                   onStartPasalo={() => startPasaloOffer(booking)}
@@ -361,8 +414,11 @@ function BookingRow({
   pasaloPrice = "",
   pasaloNote = "",
   isConfirmingCancel = false,
+  isPasaloFirstCancel = false,
+  isCancelling = false,
   onRequestCancel,
   onConfirmCancel,
+  onProceedCancel,
   onDismissCancel,
   onEdit,
   onStartPasalo,
@@ -385,8 +441,11 @@ function BookingRow({
   pasaloPrice?: string
   pasaloNote?: string
   isConfirmingCancel?: boolean
+  isPasaloFirstCancel?: boolean
+  isCancelling?: boolean
   onRequestCancel?: () => void
   onConfirmCancel?: () => void
+  onProceedCancel?: () => void
   onDismissCancel?: () => void
   onEdit?: () => void
   onStartPasalo?: () => void
@@ -516,7 +575,41 @@ function BookingRow({
         </div>
 
         {!compact ? (
-          isConfirmingCancel ? (
+          isPasaloFirstCancel ? (
+            <div className="grid max-w-md shrink-0 gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="grid gap-1">
+                <span className="text-sm font-medium">
+                  Offer this booking as Pasalo first?
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  This gives other players a chance to take the slot before you
+                  cancel it completely.
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={onStartPasalo}>
+                  <RefreshCw className="size-4" aria-hidden="true" />
+                  Offer Pasalo
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={onProceedCancel}
+                >
+                  No, cancel booking
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onDismissCancel}
+                >
+                  Keep booking
+                </Button>
+              </div>
+            </div>
+          ) : isConfirmingCancel ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Cancel this booking?
@@ -525,14 +618,16 @@ function BookingRow({
                 type="button"
                 variant="destructive"
                 size="sm"
+                disabled={isCancelling}
                 onClick={onConfirmCancel}
               >
-                Yes, cancel
+                {isCancelling ? "Cancelling..." : "Yes, cancel"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                disabled={isCancelling}
                 onClick={onDismissCancel}
               >
                 No, keep it

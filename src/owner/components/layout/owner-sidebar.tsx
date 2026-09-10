@@ -1,7 +1,9 @@
 import {
   Building2,
   CalendarCheck,
+  CreditCard,
   LayoutDashboard,
+  Bell,
   Receipt,
   Settings2,
 } from "lucide-react"
@@ -13,11 +15,19 @@ import { useOwnerBranding } from "@/owner/lib/owner-branding-context"
 const navItems = [
   { to: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/owner/gyms", label: "My Gyms", icon: Building2 },
+  { to: "/owner/payment-methods", label: "Payment Methods", icon: CreditCard },
   { to: "/owner/transactions", label: "Transactions", icon: Receipt },
+  { to: "/owner/notifications", label: "Notifications", icon: Bell },
   { to: "/owner/configuration", label: "Configuration", icon: Settings2 },
 ]
 
-export function OwnerSidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function OwnerSidebar({
+  onNavigate,
+  unreadNotifications = 0,
+}: {
+  onNavigate?: () => void
+  unreadNotifications?: number
+}) {
   const { branding, brandLabel } = useOwnerBranding()
 
   return (
@@ -78,6 +88,12 @@ export function OwnerSidebar({ onNavigate }: { onNavigate?: () => void }) {
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
             {item.label}
+            {item.to === "/owner/notifications" &&
+            unreadNotifications > 0 ? (
+              <span className="ml-auto flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] leading-5 font-semibold text-destructive-foreground">
+                {unreadNotifications > 9 ? "9+" : unreadNotifications}
+              </span>
+            ) : null}
           </NavLink>
         ))}
       </nav>

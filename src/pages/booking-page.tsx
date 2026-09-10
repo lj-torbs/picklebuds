@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import {
   ArrowRight,
-  Bell,
   Building2,
   CalendarCheck,
   Clock3,
@@ -24,7 +23,9 @@ import {
   getVenuesWithApi,
   type VenueDetailApiResponse,
 } from "@/lib/booking-api"
+import { useAuth } from "@/lib/auth-context"
 import { formatCurrency, pesoSymbol } from "@/lib/currency"
+import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 
@@ -190,6 +191,7 @@ function mapVenueDetailToGym(venue: VenueDetailApiResponse): Gym {
 
 export function BookingPage() {
   const { gyms: fallbackGyms } = useGyms()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [locationFilter, setLocationFilter] = useState("all")
@@ -273,7 +275,7 @@ export function BookingPage() {
     <main className="min-h-svh bg-muted/30">
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/booking" className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
@@ -287,13 +289,7 @@ export function BookingPage() {
             </span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link
-              to="/notifications"
-              className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-              aria-label="Notifications"
-            >
-              <Bell className="size-4" aria-hidden="true" />
-            </Link>
+            <NotificationBellLink token={user?.token} to="/notifications" />
             <Link
               to="/profile"
               className={buttonVariants({ variant: "ghost", size: "icon-sm" })}

@@ -1,15 +1,31 @@
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Plus } from "lucide-react"
+import {
+  Building2,
+  CalendarClock,
+  ChevronDown,
+  CreditCard,
+  Loader2,
+  MapPin,
+  Pencil,
+  Phone,
+  Plus,
+  Trash2,
+} from "lucide-react"
 
-import { OwnerWorkspaceHero } from "@/owner/components/layout/owner-workspace-hero"
 import { CourtFormSheet } from "@/shared/components/gyms/court-form-sheet"
-import { GymCard } from "@/shared/components/gyms/gym-card"
+import {
+  CourtStatusBadge,
+  GymStatusBadge,
+} from "@/shared/components/gyms/gym-status-badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency } from "@/lib/currency"
 import { useToast } from "@/components/ui/toast"
 import {
   createOwnerCourtWithApi,
   deleteOwnerCourtWithApi,
+  deleteOwnerVenueWithApi,
   getOwnerVenuesWithApi,
   setOwnerCourtStatusWithApi,
   setOwnerVenueStatusWithApi,
@@ -28,6 +44,17 @@ export function OwnerGymsPage() {
   const [courtFormOpen, setCourtFormOpen] = useState(false)
   const [activeGymId, setActiveGymId] = useState<string | null>(null)
   const [editingCourt, setEditingCourt] = useState<Court | null>(null)
+  const [expandedGymIds, setExpandedGymIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [confirmingRemoveCourtId, setConfirmingRemoveCourtId] = useState<
+    string | null
+  >(null)
+  const [deletingCourtId, setDeletingCourtId] = useState<string | null>(null)
+  const [confirmingRemoveGymId, setConfirmingRemoveGymId] = useState<
+    string | null
+  >(null)
+  const [deletingGymId, setDeletingGymId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!owner?.token) {
@@ -67,10 +94,44 @@ export function OwnerGymsPage() {
     )
   }
 
+  function removeGym(gymId: string) {
+    setGyms((current) => current.filter((gym) => gym.id !== gymId))
+    setExpandedGymIds((current) => {
+      const next = new Set(current)
+      next.delete(gymId)
+      return next
+    })
+  }
+
+  function getCourtActionId(gymId: string, courtId: string) {
+    return `${gymId}:${courtId}`
+  }
+
   function openAddCourt(gymId: string) {
     setActiveGymId(gymId)
     setEditingCourt(null)
+    setConfirmingRemoveCourtId(null)
+    setConfirmingRemoveGymId(null)
     setCourtFormOpen(true)
+  }
+
+  function toggleGymExpansion(gymId: string) {
+    setExpandedGymIds((current) => {
+      const next = new Set(current)
+      if (next.has(gymId)) {
+        next.delete(gymId)
+      } else {
+        next.add(gymId)
+      }
+      return next
+    })
+  }
+
+  function toggleAllGyms() {
+    setExpandedGymIds((current) => {
+      const allExpanded = gyms.every((gym) => current.has(gym.id))
+      return allExpanded ? new Set() : new Set(gyms.map((gym) => gym.id))
+    })
   }
 
   async function handleSaveCourt(values: {
@@ -141,6 +202,34 @@ export function OwnerGymsPage() {
     }
   }
 
+  async function handleRemoveGym(gym: Gym) {
+    if (!owner?.token) {
+      return
+    }
+
+    setDeletingGymId(gym.id)
+
+    try {
+      await deleteOwnerVenueWithApi(owner.token, gym.id)
+      removeGym(gym.id)
+      setConfirmingRemoveGymId(null)
+      toast.add({
+        title: "Gym deleted",
+        description: `${gym.name} has been removed.`,
+        type: "success",
+      })
+    } catch (nextError) {
+      toast.add({
+        title: "Unable to delete gym",
+        description:
+          nextError instanceof Error ? nextError.message : "Please try again.",
+        type: "error",
+      })
+    } finally {
+      setDeletingGymId(null)
+    }
+  }
+
   async function handleToggleCourtStatus(gymId: string, court: Court) {
     if (!owner?.token) {
       return
@@ -176,6 +265,9 @@ export function OwnerGymsPage() {
       return
     }
 
+    const courtActionId = getCourtActionId(gymId, court.id)
+    setDeletingCourtId(courtActionId)
+
     try {
       const response = await deleteOwnerCourtWithApi(
         owner.token,
@@ -183,6 +275,7 @@ export function OwnerGymsPage() {
         court.id
       )
       replaceGym(mapOwnerVenueToGym(response))
+      setConfirmingRemoveCourtId(null)
       toast.add({
         title: "Court removed",
         description: `${court.name} has been removed.`,
@@ -195,23 +288,70 @@ export function OwnerGymsPage() {
           nextError instanceof Error ? nextError.message : "Please try again.",
         type: "error",
       })
+    } finally {
+      setDeletingCourtId(null)
     }
   }
 
+  const summary = useMemo(() => {
+    const courts = gyms.flatMap((gym) => gym.courts)
+
+    return {
+      activeGyms: gyms.filter((gym) => gym.status === "active").length,
+      totalCourts: courts.length,
+      openPlayCourts: courts.filter(
+        (court) => court.bookingMode === "open-play"
+      ).length,
+      maintenanceCourts: courts.filter(
+        (court) => court.status === "maintenance"
+      ).length,
+      paymentMethods: gyms.reduce(
+        (total, gym) => total + gym.paymentOptions.length,
+        0
+      ),
+    }
+  }, [gyms])
+
+  const allGymsExpanded =
+    gyms.length > 0 && gyms.every((gym) => expandedGymIds.has(gym.id))
+
   return (
     <div className="grid gap-6">
-      <OwnerWorkspaceHero
-        eyebrow="Venues"
-        title="Venue management"
-        description="Manage courts, payment methods, whole gym access, and booking availability across every venue in your owner workspace."
-        meta="Venue management"
-        actions={
+      <section className="grid gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-primary">Venues</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+              My gyms
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Scan venue setup, payment coverage, whole-gym booking, and court
+              availability without opening bulky cards.
+            </p>
+          </div>
           <Button type="button" onClick={() => navigate("/owner/gyms/new")}>
             <Plus className="size-4" aria-hidden="true" />
             Add gym
           </Button>
-        }
-      />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            { label: "Active gyms", value: summary.activeGyms },
+            { label: "Courts", value: summary.totalCourts },
+            { label: "Open Play", value: summary.openPlayCourts },
+            { label: "Maintenance", value: summary.maintenanceCourts },
+            { label: "Payment methods", value: summary.paymentMethods },
+          ].map((item) => (
+            <Card key={item.label} className="rounded-lg">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+                <p className="mt-1 text-2xl font-semibold">{item.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
@@ -234,26 +374,496 @@ export function OwnerGymsPage() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {gyms.map((gym) => (
-            <GymCard
-              key={gym.id}
-              gym={gym}
-              onEditGym={(current) =>
-                navigate(`/owner/gyms/${current.id}/edit`)
-              }
-              onToggleGymStatus={handleToggleGymStatus}
-              onAddCourt={openAddCourt}
-              onEditCourt={(gymId, court) => {
-                setActiveGymId(gymId)
-                setEditingCourt(court)
-                setCourtFormOpen(true)
-              }}
-              onToggleCourtStatus={handleToggleCourtStatus}
-              onRemoveCourt={handleRemoveCourt}
-            />
-          ))}
-        </div>
+        <Card className="overflow-hidden rounded-lg">
+          <CardHeader className="flex-row items-center justify-between border-b px-4 py-3">
+            <CardTitle className="text-base">Venue list</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleAllGyms}
+            >
+              {allGymsExpanded ? "Collapse all" : "Expand all"}
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[64rem] border-collapse text-sm">
+                <thead className="bg-muted/40 text-xs text-muted-foreground">
+                  <tr className="border-b">
+                    <th className="w-10 px-4 py-3 text-left font-medium" />
+                    <th className="px-4 py-3 text-left font-medium">Gym</th>
+                    <th className="px-4 py-3 text-left font-medium">Courts</th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Payments
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      Whole gym
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gyms.map((gym) => {
+                    const isExpanded = expandedGymIds.has(gym.id)
+                    const availableCourts = gym.courts.filter(
+                      (court) => court.status === "available"
+                    ).length
+                    const courtRateRange = gym.courts.length
+                      ? `${formatCurrency(
+                          Math.min(
+                            ...gym.courts.map((court) => court.pricePerHour)
+                          )
+                        )}-${formatCurrency(
+                          Math.max(
+                            ...gym.courts.map((court) => court.pricePerHour)
+                          )
+                        )}/hr`
+                      : "No rate"
+
+                    return (
+                      <Fragment key={gym.id}>
+                        <tr className="border-b align-top">
+                          <td className="px-4 py-4">
+                            <button
+                              type="button"
+                              onClick={() => toggleGymExpansion(gym.id)}
+                              className="flex size-8 items-center justify-center rounded-md border bg-background transition hover:border-primary/50 hover:bg-primary/5"
+                              aria-label={
+                                isExpanded
+                                  ? `Collapse ${gym.name}`
+                                  : `Expand ${gym.name}`
+                              }
+                            >
+                              <ChevronDown
+                                className={`size-4 transition ${isExpanded ? "" : "-rotate-90"}`}
+                                aria-hidden="true"
+                              />
+                            </button>
+                          </td>
+                          <td className="max-w-[22rem] px-4 py-4">
+                            <div className="flex min-w-0 gap-3">
+                              <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/40">
+                                {gym.imageUrl ? (
+                                  <img
+                                    src={gym.imageUrl}
+                                    alt={`${gym.name} cover`}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <Building2
+                                    className="size-5 text-muted-foreground"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">
+                                  {gym.name}
+                                </p>
+                                <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                                  <MapPin
+                                    className="size-3.5 shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                  {gym.address}
+                                </p>
+                                {gym.phone ? (
+                                  <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                                    <Phone
+                                      className="size-3.5 shrink-0"
+                                      aria-hidden="true"
+                                    />
+                                    {gym.phone}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="grid gap-1">
+                              <span className="font-medium">
+                                {availableCourts}/{gym.courts.length} available
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {courtRateRange}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            {gym.paymentOptions.length > 0 ? (
+                              <div className="flex max-w-56 flex-wrap gap-1.5">
+                                {gym.paymentOptions
+                                  .slice(0, 3)
+                                  .map((option, index) => (
+                                    <span
+                                      key={`${option.provider}-${option.accountNumber}-${index}`}
+                                      className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium"
+                                    >
+                                      <CreditCard
+                                        className="size-3"
+                                        aria-hidden="true"
+                                      />
+                                      {option.provider}
+                                    </span>
+                                  ))}
+                                {gym.paymentOptions.length > 3 ? (
+                                  <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                                    +{gym.paymentOptions.length - 3}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-destructive">
+                                No payment setup
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            {gym.wholeGymBooking?.enabled ? (
+                              <div className="grid gap-1">
+                                <span className="font-medium">
+                                  {formatCurrency(
+                                    gym.wholeGymBooking.pricePerHour
+                                  )}
+                                  /hr
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <CalendarClock
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  {gym.wholeGymBooking.availableSlots.length}{" "}
+                                  slots
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                Disabled
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <GymStatusBadge status={gym.status} />
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openAddCourt(gym.id)}
+                              >
+                                <Plus className="size-4" aria-hidden="true" />
+                                Court
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Edit ${gym.name}`}
+                                onClick={() => {
+                                  setConfirmingRemoveGymId(null)
+                                  navigate(`/owner/gyms/${gym.id}/edit`)
+                                }}
+                              >
+                                <Pencil className="size-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleGymStatus(gym)}
+                              >
+                                {gym.status === "active"
+                                  ? "Deactivate"
+                                  : "Activate"}
+                              </Button>
+                              {confirmingRemoveGymId === gym.id ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={deletingGymId === gym.id}
+                                    onClick={() => handleRemoveGym(gym)}
+                                  >
+                                    {deletingGymId === gym.id ? (
+                                      <Loader2
+                                        className="size-4 animate-spin"
+                                        aria-hidden="true"
+                                      />
+                                    ) : null}
+                                    Confirm delete
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={deletingGymId === gym.id}
+                                    onClick={() =>
+                                      setConfirmingRemoveGymId(null)
+                                    }
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Delete ${gym.name}`}
+                                  title={`Delete ${gym.name}`}
+                                  onClick={() => {
+                                    setConfirmingRemoveCourtId(null)
+                                    setConfirmingRemoveGymId(gym.id)
+                                  }}
+                                >
+                                  <Trash2
+                                    className="size-4"
+                                    aria-hidden="true"
+                                  />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+
+                        {isExpanded ? (
+                          <tr className="border-b">
+                            <td className="bg-muted/20 px-4 py-4" />
+                            <td colSpan={6} className="bg-muted/20 px-4 py-4">
+                              <div className="grid gap-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">
+                                    Courts at {gym.name}
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openAddCourt(gym.id)}
+                                  >
+                                    <Plus
+                                      className="size-4"
+                                      aria-hidden="true"
+                                    />
+                                    Add court
+                                  </Button>
+                                </div>
+
+                                {gym.courts.length === 0 ? (
+                                  <div className="rounded-lg border border-dashed bg-card p-4 text-sm text-muted-foreground">
+                                    No courts yet. Add one to start taking
+                                    bookings.
+                                  </div>
+                                ) : (
+                                  <div className="overflow-hidden rounded-lg border bg-card">
+                                    <table className="w-full min-w-[48rem] border-collapse text-sm">
+                                      <thead className="bg-background text-xs text-muted-foreground">
+                                        <tr className="border-b">
+                                          <th className="px-3 py-2 text-left font-medium">
+                                            Court
+                                          </th>
+                                          <th className="px-3 py-2 text-left font-medium">
+                                            Mode
+                                          </th>
+                                          <th className="px-3 py-2 text-left font-medium">
+                                            Rate
+                                          </th>
+                                          <th className="px-3 py-2 text-left font-medium">
+                                            Availability
+                                          </th>
+                                          <th className="px-3 py-2 text-left font-medium">
+                                            Status
+                                          </th>
+                                          <th className="px-3 py-2 text-right font-medium">
+                                            Actions
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {gym.courts.map((court) => (
+                                          <tr
+                                            key={court.id}
+                                            className="border-b last:border-b-0"
+                                          >
+                                            <td className="px-3 py-3">
+                                              <div className="grid gap-1">
+                                                <span className="font-medium">
+                                                  {court.name}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {court.surface} /{" "}
+                                                  {court.capacity}
+                                                </span>
+                                              </div>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                              <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                                                {court.bookingMode ===
+                                                "open-play"
+                                                  ? `Open Play${
+                                                      court.openPlayCapacity
+                                                        ? ` / ${court.openPlayCapacity} players`
+                                                        : ""
+                                                    }`
+                                                  : "Private"}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-3 font-medium">
+                                              {formatCurrency(
+                                                court.pricePerHour
+                                              )}
+                                              /hr
+                                            </td>
+                                            <td className="px-3 py-3 text-muted-foreground">
+                                              {court.availableSlots.length}{" "}
+                                              slots
+                                            </td>
+                                            <td className="px-3 py-3">
+                                              <CourtStatusBadge
+                                                status={court.status}
+                                              />
+                                            </td>
+                                            <td className="px-3 py-3">
+                                              <div className="flex justify-end gap-2">
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() =>
+                                                    handleToggleCourtStatus(
+                                                      gym.id,
+                                                      court
+                                                    )
+                                                  }
+                                                >
+                                                  {court.status === "available"
+                                                    ? "Maintenance"
+                                                    : "Available"}
+                                                </Button>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="icon-sm"
+                                                  aria-label={`Edit ${court.name}`}
+                                                  onClick={() => {
+                                                    setActiveGymId(gym.id)
+                                                    setEditingCourt(court)
+                                                    setConfirmingRemoveCourtId(
+                                                      null
+                                                    )
+                                                    setCourtFormOpen(true)
+                                                  }}
+                                                >
+                                                  <Pencil
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                  />
+                                                </Button>
+                                                {confirmingRemoveCourtId ===
+                                                getCourtActionId(
+                                                  gym.id,
+                                                  court.id
+                                                ) ? (
+                                                  <>
+                                                    <Button
+                                                      type="button"
+                                                      variant="destructive"
+                                                      size="sm"
+                                                      disabled={
+                                                        deletingCourtId ===
+                                                        getCourtActionId(
+                                                          gym.id,
+                                                          court.id
+                                                        )
+                                                      }
+                                                      onClick={() =>
+                                                        handleRemoveCourt(
+                                                          gym.id,
+                                                          court
+                                                        )
+                                                      }
+                                                    >
+                                                      {deletingCourtId ===
+                                                      getCourtActionId(
+                                                        gym.id,
+                                                        court.id
+                                                      ) ? (
+                                                        <Loader2
+                                                          className="size-4 animate-spin"
+                                                          aria-hidden="true"
+                                                        />
+                                                      ) : null}
+                                                      Confirm delete
+                                                    </Button>
+                                                    <Button
+                                                      type="button"
+                                                      variant="outline"
+                                                      size="sm"
+                                                      disabled={
+                                                        deletingCourtId ===
+                                                        getCourtActionId(
+                                                          gym.id,
+                                                          court.id
+                                                        )
+                                                      }
+                                                      onClick={() =>
+                                                        setConfirmingRemoveCourtId(
+                                                          null
+                                                        )
+                                                      }
+                                                    >
+                                                      Cancel
+                                                    </Button>
+                                                  </>
+                                                ) : (
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    aria-label={`Remove ${court.name}`}
+                                                    title={`Delete ${court.name}`}
+                                                    onClick={() =>
+                                                      setConfirmingRemoveCourtId(
+                                                        getCourtActionId(
+                                                          gym.id,
+                                                          court.id
+                                                        )
+                                                      )
+                                                    }
+                                                  >
+                                                    <Trash2
+                                                      className="size-4"
+                                                      aria-hidden="true"
+                                                    />
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <CourtFormSheet

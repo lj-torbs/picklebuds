@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import {
   CalendarDays,
   CircleAlert,
@@ -46,10 +47,15 @@ export function TransactionDetailSheet({
   onRefund: (id: string) => void | Promise<void>
   isSubmitting?: boolean
 }) {
+  const [confirmingOwnerCancel, setConfirmingOwnerCancel] = useState(false)
   const canApprove = transaction?.status === "pending" && !!transaction.paymentReceipt
   const canComplete = transaction?.status === "confirmed"
   const destructiveActionLabel =
     transaction?.status === "pending" ? "Reject payment" : "Cancel booking"
+
+  useEffect(() => {
+    setConfirmingOwnerCancel(false)
+  }, [open, transaction?.id])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -234,15 +240,54 @@ export function TransactionDetailSheet({
               >
                 {isSubmitting ? "Saving..." : "Mark completed"}
               </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                disabled={transaction.status === "cancelled" || isSubmitting}
-                onClick={() => onCancel(transaction.id)}
-              >
-                {isSubmitting ? "Saving..." : destructiveActionLabel}
-              </Button>
+              {confirmingOwnerCancel ? (
+                <div className="col-span-2 grid gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="text-sm font-medium">
+                    Offer Pasalo before cancelling?
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    If the player can transfer this slot, the court stays
+                    bookable for another player. Continue only when you want to
+                    cancel the booking outright.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={isSubmitting}
+                      onClick={() => onCancel(transaction.id)}
+                    >
+                      {isSubmitting ? "Saving..." : "Proceed cancellation"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isSubmitting}
+                      onClick={() => setConfirmingOwnerCancel(false)}
+                    >
+                      Keep booking
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={transaction.status === "cancelled" || isSubmitting}
+                  onClick={() => {
+                    if (transaction.status === "confirmed") {
+                      setConfirmingOwnerCancel(true)
+                      return
+                    }
+                    void onCancel(transaction.id)
+                  }}
+                >
+                  {isSubmitting ? "Saving..." : destructiveActionLabel}
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="destructive"

@@ -362,6 +362,40 @@ export function cancelOwnerBookingWithApi(
   return postOwnerBookingAction(token, bookingPublicId, "cancel")
 }
 
+export async function cancelPlayerBookingWithApi(
+  token: string,
+  bookingPublicId: string
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/bookings/${bookingPublicId}/player-cancel`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  )
+
+  let payload: BookingActionApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to cancel this booking right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as BookingActionApiResponse
+}
+
 export function refundOwnerBookingWithApi(
   token: string,
   bookingPublicId: string

@@ -278,6 +278,7 @@ export function OwnerBrandingProvider({
 
   React.useEffect(() => {
     if (!owner) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Branding state follows the active owner session.
       setBrandingState(createDefaultBranding("Owner"))
       return
     }
