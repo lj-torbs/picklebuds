@@ -9,6 +9,54 @@ import { cn } from "@/lib/utils"
 import type { Transaction } from "@/shared/lib/transactions-context"
 import { Button } from "@/components/ui/button"
 
+function parseDateValue(value: string) {
+  const [year, month, day] = value.split("-").map(Number)
+
+  if (!year || !month || !day) {
+    return null
+  }
+
+  return new Date(year, month - 1, day)
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function getAdvanceBookingDays(dateValue: string) {
+  const bookingDate = parseDateValue(dateValue)
+
+  if (!bookingDate) {
+    return 0
+  }
+
+  const today = startOfLocalDay(new Date())
+  const bookingDay = startOfLocalDay(bookingDate)
+  return Math.round(
+    (bookingDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  )
+}
+
+function getAdvanceBookingLabel(daysAhead: number) {
+  if (daysAhead >= 60) {
+    return `${Math.floor(daysAhead / 30)} mo advance`
+  }
+
+  if (daysAhead >= 30) {
+    return "1 mo advance"
+  }
+
+  if (daysAhead >= 14) {
+    return `${Math.floor(daysAhead / 7)} wk advance`
+  }
+
+  if (daysAhead >= 7) {
+    return "1 wk advance"
+  }
+
+  return null
+}
+
 export function TransactionTable({
   transactions,
   onView,
@@ -46,6 +94,8 @@ export function TransactionTable({
         <tbody className="divide-y">
           {transactions.map((transaction) => {
             const isHighlighted = highlightedTransactionId === transaction.id
+            const daysAhead = getAdvanceBookingDays(transaction.date)
+            const advanceBookingLabel = getAdvanceBookingLabel(daysAhead)
             return (
             <tr
               key={transaction.id}
@@ -82,7 +132,21 @@ export function TransactionTable({
               </td>
               <td className="px-4 py-2.5 whitespace-nowrap">
                 <div className="grid gap-1">
-                  <span>{transaction.date}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{transaction.date}</span>
+                    {advanceBookingLabel ? (
+                      <span
+                        className={cn(
+                          "rounded-md px-2 py-0.5 text-[11px] font-medium",
+                          daysAhead >= 30
+                            ? "bg-primary/10 text-primary"
+                            : "bg-amber-500/10 text-amber-700"
+                        )}
+                      >
+                        {advanceBookingLabel}
+                      </span>
+                    ) : null}
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     {transaction.slots.join(", ")}
                   </span>

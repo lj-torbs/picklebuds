@@ -1,10 +1,14 @@
 import type { Gym } from "@/shared/lib/gyms-context"
 import type { OwnerVenueApiResponse } from "@/lib/owner-api"
+import { mapOwnerBrandingApiToConfig } from "@/owner/lib/owner-branding-context"
 
 export function mapOwnerVenueToGym(venue: OwnerVenueApiResponse): Gym {
   return {
     id: venue.public_id,
     ownerId: venue.owner_public_id,
+    ownerBranding: venue.owner_branding
+      ? mapOwnerBrandingApiToConfig(venue.owner_branding, venue.name)
+      : undefined,
     name: venue.name,
     address: venue.address,
     phone: venue.phone ?? "",

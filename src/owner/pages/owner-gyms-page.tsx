@@ -10,6 +10,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  Search,
   Trash2,
 } from "lucide-react"
 
@@ -19,7 +20,8 @@ import {
   GymStatusBadge,
 } from "@/shared/components/gyms/gym-status-badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { formatCurrency } from "@/lib/currency"
 import { useToast } from "@/components/ui/toast"
 import {
@@ -55,6 +57,7 @@ export function OwnerGymsPage() {
     string | null
   >(null)
   const [deletingGymId, setDeletingGymId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     if (!owner?.token) {
@@ -124,13 +127,6 @@ export function OwnerGymsPage() {
         next.add(gymId)
       }
       return next
-    })
-  }
-
-  function toggleAllGyms() {
-    setExpandedGymIds((current) => {
-      const allExpanded = gyms.every((gym) => current.has(gym.id))
-      return allExpanded ? new Set() : new Set(gyms.map((gym) => gym.id))
     })
   }
 
@@ -293,27 +289,57 @@ export function OwnerGymsPage() {
     }
   }
 
-  const summary = useMemo(() => {
-    const courts = gyms.flatMap((gym) => gym.courts)
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase()
 
-    return {
-      activeGyms: gyms.filter((gym) => gym.status === "active").length,
-      totalCourts: courts.length,
-      openPlayCourts: courts.filter(
-        (court) => court.bookingMode === "open-play"
-      ).length,
-      maintenanceCourts: courts.filter(
-        (court) => court.status === "maintenance"
-      ).length,
-      paymentMethods: gyms.reduce(
-        (total, gym) => total + gym.paymentOptions.length,
-        0
-      ),
+  function courtMatchesQuery(court: Court) {
+    if (!normalizedSearchQuery) {
+      return true
     }
-  }, [gyms])
 
-  const allGymsExpanded =
-    gyms.length > 0 && gyms.every((gym) => expandedGymIds.has(gym.id))
+    return [
+      court.name,
+      court.surface,
+      court.capacity,
+      court.status,
+      court.bookingMode,
+      String(court.pricePerHour),
+    ].some((value) => value.toLowerCase().includes(normalizedSearchQuery))
+  }
+
+  function gymMatchesQuery(gym: Gym) {
+    if (!normalizedSearchQuery) {
+      return true
+    }
+
+    return [
+      gym.name,
+      gym.address,
+      gym.phone,
+      gym.status,
+      ...gym.paymentOptions.map((option) => option.provider),
+    ]
+      .filter(Boolean)
+      .some((value) =>
+        String(value).toLowerCase().includes(normalizedSearchQuery)
+      )
+  }
+
+  function getVisibleCourts(gym: Gym) {
+    if (!normalizedSearchQuery || gymMatchesQuery(gym)) {
+      return gym.courts
+    }
+
+    return gym.courts.filter(courtMatchesQuery)
+  }
+
+  const filteredGyms = useMemo(
+    () =>
+      gyms.filter(
+        (gym) =>
+          gymMatchesQuery(gym) || gym.courts.some((court) => courtMatchesQuery(court))
+      ),
+    [gyms, normalizedSearchQuery]
+  )
 
   return (
     <div className="grid gap-6">
@@ -333,23 +359,6 @@ export function OwnerGymsPage() {
             <Plus className="size-4" aria-hidden="true" />
             Add gym
           </Button>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {[
-            { label: "Active gyms", value: summary.activeGyms },
-            { label: "Courts", value: summary.totalCourts },
-            { label: "Open Play", value: summary.openPlayCourts },
-            { label: "Maintenance", value: summary.maintenanceCourts },
-            { label: "Payment methods", value: summary.paymentMethods },
-          ].map((item) => (
-            <Card key={item.label} className="rounded-lg">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className="mt-1 text-2xl font-semibold">{item.value}</p>
-              </CardContent>
-            </Card>
-          ))}
         </div>
       </section>
 
@@ -375,18 +384,34 @@ export function OwnerGymsPage() {
         </div>
       ) : (
         <Card className="overflow-hidden rounded-lg">
-          <CardHeader className="flex-row items-center justify-between border-b px-4 py-3">
-            <CardTitle className="text-base">Venue list</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={toggleAllGyms}
-            >
-              {allGymsExpanded ? "Collapse all" : "Expand all"}
-            </Button>
-          </CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="relative min-w-0 flex-1 sm:max-w-md">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="h-9 pl-9"
+                placeholder="Search gyms or courts"
+              />
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {filteredGyms.length} of {gyms.length} venue
+              {gyms.length === 1 ? "" : "s"}
+            </span>
+          </div>
           <CardContent className="p-0">
+            {filteredGyms.length === 0 ? (
+              <div className="grid gap-1 p-6 text-center">
+                <p className="text-sm font-medium">No matching gyms or courts</p>
+                <p className="text-sm text-muted-foreground">
+                  Try searching by gym name, address, court name, surface, or
+                  booking mode.
+                </p>
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[64rem] border-collapse text-sm">
                 <thead className="bg-muted/40 text-xs text-muted-foreground">
@@ -407,8 +432,10 @@ export function OwnerGymsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {gyms.map((gym) => {
-                    const isExpanded = expandedGymIds.has(gym.id)
+                  {filteredGyms.map((gym) => {
+                    const isExpanded =
+                      expandedGymIds.has(gym.id) || Boolean(normalizedSearchQuery)
+                    const visibleCourts = getVisibleCourts(gym)
                     const availableCourts = gym.courts.filter(
                       (court) => court.status === "available"
                     ).length
@@ -656,10 +683,11 @@ export function OwnerGymsPage() {
                                   </Button>
                                 </div>
 
-                                {gym.courts.length === 0 ? (
+                                {visibleCourts.length === 0 ? (
                                   <div className="rounded-lg border border-dashed bg-card p-4 text-sm text-muted-foreground">
-                                    No courts yet. Add one to start taking
-                                    bookings.
+                                    {gym.courts.length === 0
+                                      ? "No courts yet. Add one to start taking bookings."
+                                      : "No courts in this gym match your search."}
                                   </div>
                                 ) : (
                                   <div className="overflow-hidden rounded-lg border bg-card">
@@ -687,7 +715,7 @@ export function OwnerGymsPage() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {gym.courts.map((court) => (
+                                        {visibleCourts.map((court) => (
                                           <tr
                                             key={court.id}
                                             className="border-b last:border-b-0"
@@ -862,6 +890,7 @@ export function OwnerGymsPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </CardContent>
         </Card>
       )}

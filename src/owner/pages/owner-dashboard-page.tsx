@@ -1,30 +1,20 @@
 import { useEffect, useMemo, useState } from "react"
-import { Link } from "react-router-dom"
 import {
-  BarChart3,
-  Building2,
+  CalendarClock,
   CheckCircle2,
-  ChartPie,
   Clock3,
   DollarSign,
   ListChecks,
-  Receipt,
   XCircle,
 } from "lucide-react"
 
-import { buttonVariants } from "@/components/ui/button-variants"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   getOwnerDashboardWithApi,
   type OwnerTransactionApiItem,
 } from "@/lib/owner-api"
 import { formatCurrency } from "@/lib/currency"
+import { cn } from "@/lib/utils"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { useOwnerBranding } from "@/owner/lib/owner-branding-context"
 import { TransactionStatusBadge } from "@/shared/components/transactions/transaction-status-badge"
@@ -37,9 +27,23 @@ type DashboardState = {
   recentTransactions: OwnerTransactionApiItem[]
 }
 
+const dateFormatter = new Intl.DateTimeFormat("en-PH", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+})
+
+const timeFormatter = new Intl.DateTimeFormat("en-PH", {
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+})
+
 export function OwnerDashboardPage() {
   const { owner } = useOwnerAuth()
-  const { branding, brandLabel } = useOwnerBranding()
+  const { branding } = useOwnerBranding()
   const [dashboard, setDashboard] = useState<DashboardState>({
     revenue: 0,
     pending: 0,
@@ -47,7 +51,16 @@ export function OwnerDashboardPage() {
     cancelled: 0,
     recentTransactions: [],
   })
+  const [now, setNow] = useState(() => new Date())
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date())
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!owner?.token) {
@@ -88,350 +101,196 @@ export function OwnerDashboardPage() {
     }
   }, [owner?.token])
 
-  const revenueChart = useMemo(() => {
-    const rows = dashboard.recentTransactions
-      .slice(0, 6)
-      .reverse()
-      .map((transaction, index) => ({
-        label: `T${index + 1}`,
-        amount: transaction.payment_status === "paid" ? transaction.amount : 0,
-      }))
-    const maxAmount = Math.max(...rows.map((row) => row.amount), 1)
-
-    return { rows, maxAmount }
-  }, [dashboard.recentTransactions])
-
-  const bookingMix = useMemo(
+  const metrics = useMemo(
     () => [
       {
-        label: "Pending review",
-        value: dashboard.pending,
+        label: "Revenue",
+        value: formatCurrency(dashboard.revenue),
+        helper: "Approved payments",
+        icon: DollarSign,
+        shell:
+          "border-primary/15 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.12),transparent_42%),linear-gradient(135deg,hsl(var(--primary)/0.06),hsl(var(--card))_64%)]",
+        iconTone: "bg-primary/10 text-primary",
+        valueTone: "text-primary",
+      },
+      {
+        label: "For review",
+        value: String(dashboard.pending),
+        helper: "Pending proofs",
         icon: Clock3,
-        tone: "text-amber-600",
+        shell:
+          "border-amber-500/20 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.16),transparent_42%),linear-gradient(135deg,rgba(245,158,11,0.07),hsl(var(--card))_64%)]",
+        iconTone: "bg-amber-500/10 text-amber-700",
+        valueTone: "text-amber-700",
       },
       {
         label: "Completed",
-        value: dashboard.completed,
+        value: String(dashboard.completed),
+        helper: "Confirmed bookings",
         icon: CheckCircle2,
-        tone: "text-primary",
+        shell:
+          "border-emerald-500/20 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_42%),linear-gradient(135deg,rgba(16,185,129,0.07),hsl(var(--card))_64%)]",
+        iconTone: "bg-emerald-500/10 text-emerald-700",
+        valueTone: "text-emerald-700",
       },
       {
         label: "Cancelled",
-        value: dashboard.cancelled,
+        value: String(dashboard.cancelled),
+        helper: "Voided bookings",
         icon: XCircle,
-        tone: "text-destructive",
+        shell:
+          "border-destructive/20 bg-[radial-gradient(circle_at_top_right,hsl(var(--destructive)/0.13),transparent_42%),linear-gradient(135deg,hsl(var(--destructive)/0.06),hsl(var(--card))_64%)]",
+        iconTone: "bg-destructive/10 text-destructive",
+        valueTone: "text-destructive",
       },
     ],
-    [dashboard.cancelled, dashboard.completed, dashboard.pending]
+    [
+      dashboard.cancelled,
+      dashboard.completed,
+      dashboard.pending,
+      dashboard.revenue,
+    ]
   )
 
   const showRecentTransactions = branding.dashboardPanels.includes(
     "recent-transactions"
   )
-  const showRevenueChart = branding.dashboardPanels.includes("revenue-chart")
-  const showBookingMix = branding.dashboardPanels.includes("booking-mix")
-  const pendingLabel =
-    dashboard.pending === 1
-      ? "1 payment needs review"
-      : `${dashboard.pending} payments need review`
-  const totalBookings =
-    dashboard.pending + dashboard.completed + dashboard.cancelled
-  const completionRate =
-    totalBookings > 0
-      ? `${Math.round((dashboard.completed / totalBookings) * 100)}%`
-      : "0%"
-  const dashboardMetrics = [
-    {
-      label: "Revenue",
-      value: formatCurrency(dashboard.revenue),
-      detail: "Approved payments",
-      icon: DollarSign,
-      tone: "bg-primary/10 text-primary",
-    },
-    {
-      label: "For review",
-      value: String(dashboard.pending),
-      detail: pendingLabel,
-      icon: Clock3,
-      tone: "bg-amber-500/10 text-amber-700",
-    },
-    {
-      label: "Completed",
-      value: String(dashboard.completed),
-      detail: `${completionRate} completion rate`,
-      icon: CheckCircle2,
-      tone: "bg-emerald-500/10 text-emerald-700",
-    },
-    {
-      label: "Cancelled",
-      value: String(dashboard.cancelled),
-      detail: "Declined or voided",
-      icon: XCircle,
-      tone: "bg-destructive/10 text-destructive",
-    },
-  ]
 
   return (
-    <div className="grid gap-6">
-      <section className="grid gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-primary">{brandLabel}</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-              Dashboard
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Payments, bookings, and owner actions in one view.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/owner/transactions"
-              className={buttonVariants({ size: "sm" })}
-            >
-              <Receipt className="size-4" aria-hidden="true" />
-              Review payments
-            </Link>
-            <Link
-              to="/owner/gyms"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <Building2 className="size-4" aria-hidden="true" />
-              Manage venues
-            </Link>
-          </div>
+    <div className="grid gap-4">
+      <section className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            Dashboard
+          </h2>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {dashboardMetrics.map((metric) => (
-              <Card key={metric.label} className="rounded-lg">
-                <CardContent className="grid gap-4 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-muted-foreground">
-                      {metric.label}
-                    </span>
-                    <span
-                      className={`flex size-8 items-center justify-center rounded-md ${metric.tone}`}
-                    >
-                      <metric.icon className="size-4" aria-hidden="true" />
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-semibold">{metric.value}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {metric.detail}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <Card className="rounded-lg">
-            <CardContent className="grid gap-3 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">Owner queue</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    What needs attention now.
-                  </p>
-                </div>
-                <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                  {branding.dashboardPanels.length} panels
-                </span>
-              </div>
-
-              <div className="grid gap-2">
-                <Link
-                  to="/owner/transactions"
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm transition hover:border-primary/50 hover:bg-primary/5"
-                >
-                  <span className="text-muted-foreground">Payment review</span>
-                  <span className="font-semibold">{dashboard.pending}</span>
-                </Link>
-                <Link
-                  to="/owner/gyms"
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm transition hover:border-primary/50 hover:bg-primary/5"
-                >
-                  <span className="text-sm text-muted-foreground">
-                    Venue setup
-                  </span>
-                  <span className="font-semibold">Manage</span>
-                </Link>
-                <div className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">Total bookings</span>
-                  <span className="font-semibold">{totalBookings}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm shadow-xs">
+          <CalendarClock className="size-4 text-primary" aria-hidden="true" />
+          <span className="text-muted-foreground">
+            {dateFormatter.format(now)}
+          </span>
+          <span className="h-4 w-px bg-border" aria-hidden="true" />
+          <span className="font-medium tabular-nums">
+            {timeFormatter.format(now)}
+          </span>
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {showRecentTransactions ? (
-          <Card className="rounded-lg xl:col-span-2">
-            <CardHeader className="flex-row items-center justify-between">
+      {error ? (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <Card
+            key={metric.label}
+            className={cn("overflow-hidden rounded-lg shadow-xs", metric.shell)}
+          >
+            <CardContent className="p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {metric.label}
+                </span>
+                <span
+                  className={cn(
+                    "flex size-7 shrink-0 items-center justify-center rounded-md",
+                    metric.iconTone
+                  )}
+                >
+                  <metric.icon className="size-3.5" aria-hidden="true" />
+                </span>
+              </div>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <p
+                  className={cn(
+                    "truncate text-xl font-semibold tracking-tight",
+                    metric.valueTone
+                  )}
+                >
+                  {metric.value}
+                </p>
+                <p className="shrink-0 pb-1 text-xs text-muted-foreground">
+                  {metric.helper}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      {showRecentTransactions ? (
+        <Card className="rounded-lg">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ListChecks
-                    className="size-5 text-primary"
-                    aria-hidden="true"
-                  />
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <ListChecks className="size-4 text-primary" />
                   Recent transactions
-                </CardTitle>
-                <CardDescription>
-                  The latest bookings placed at your venues.
-                </CardDescription>
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Latest bookings from your venues.
+                </p>
               </div>
-              <Link
-                to="/owner/transactions"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                <Receipt className="size-4" aria-hidden="true" />
-                View all
-              </Link>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {error ? (
-                <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  {error}
-                </p>
-              ) : dashboard.recentTransactions.length === 0 ? (
-                <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  No transactions yet for your venues.
-                </p>
-              ) : (
-                dashboard.recentTransactions.map((transaction) => (
-                  <div
-                    key={transaction.public_id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3"
-                  >
-                    <div>
-                      <p className="font-medium">{transaction.customer_name}</p>
-                      <p className="text-2x; text-muted-foreground">
-                        {transaction.venue_name} /{" "}
-                        {transaction.court_name ?? "Whole gym"} /{" "}
-                        {transaction.booking_date}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium">
-                        {formatCurrency(transaction.amount)}
-                      </span>
-                      <TransactionStatusBadge status={transaction.status} />
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
+            </div>
 
-        {showRevenueChart ? (
-          <Card className="rounded-lg">
-            <CardHeader className="flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3
-                    className="size-5 text-primary"
-                    aria-hidden="true"
-                  />
-                  Revenue graph
-                </CardTitle>
-                <CardDescription>
-                  Paid booking revenue from recent transactions.
-                </CardDescription>
+            {dashboard.recentTransactions.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">
+                No transactions yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium">
+                        Customer
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium">
+                        Venue
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium">Date</th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        Amount
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.recentTransactions
+                      .slice(0, 6)
+                      .map((transaction) => (
+                        <tr key={transaction.public_id} className="border-t">
+                          <td className="px-4 py-3 font-medium">
+                            {transaction.customer_name}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {transaction.venue_name}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {transaction.booking_date}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium">
+                            {formatCurrency(transaction.amount)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <TransactionStatusBadge
+                              status={transaction.status}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
-              <Link
-                to="/owner/transactions"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                <Receipt className="size-4" aria-hidden="true" />
-                View all
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {error ? (
-                <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  {error}
-                </p>
-              ) : revenueChart.rows.length === 0 ? (
-                <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  No revenue data yet.
-                </p>
-              ) : (
-                <div className="grid gap-4">
-                  <div className="flex h-56 items-end gap-3 rounded-lg border bg-muted/20 p-4">
-                    {revenueChart.rows.map((row) => (
-                      <div
-                        key={row.label}
-                        className="flex h-full flex-1 flex-col justify-end gap-2"
-                      >
-                        <span className="text-center text-xs font-medium">
-                          {formatCurrency(row.amount)}
-                        </span>
-                        <span
-                          className="min-h-2 rounded-t-md bg-primary"
-                          style={{
-                            height: `${Math.max((row.amount / revenueChart.maxAmount) * 100, 4)}%`,
-                          }}
-                        />
-                        <span className="text-center text-xs text-muted-foreground">
-                          {row.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    This chart uses the most recent paid transactions available
-                    on the owner dashboard.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {showBookingMix ? (
-          <Card className="rounded-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ChartPie className="size-5 text-primary" aria-hidden="true" />
-                Booking mix
-              </CardTitle>
-              <CardDescription>
-                Status breakdown for the bookings in your venues.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                {bookingMix.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-lg border bg-muted/20 p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <item.icon
-                        className={`size-5 ${item.tone}`}
-                        aria-hidden="true"
-                      />
-                      <span className="text-2xl font-semibold">
-                        {item.value}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {item.label}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

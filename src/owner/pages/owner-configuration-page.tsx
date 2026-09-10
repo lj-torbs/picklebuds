@@ -1,15 +1,12 @@
 import {
-  BarChart3,
   Check,
-  ChartPie,
   LayoutDashboard,
   ListChecks,
-  Receipt,
+  Menu,
+  PanelLeft,
   RefreshCcw,
   Save,
-  Settings2,
   Upload,
-  WalletCards,
 } from "lucide-react"
 import { useEffect, useMemo, useState, type ChangeEvent } from "react"
 
@@ -29,8 +26,8 @@ import {
   buildOwnerBrandingStyle,
   type OwnerBrandingConfig,
   type OwnerBrandingDensity,
+  type OwnerNavigationLayout,
   type OwnerBrandingStyle,
-  type OwnerDashboardPanel,
   useOwnerBranding,
 } from "@/owner/lib/owner-branding-context"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
@@ -59,6 +56,18 @@ const themePresets: ThemePreset[] = [
     },
   },
   {
+    id: "emerald-league",
+    name: "Emerald League",
+    description: "Polished green and ink interface for competitive clubs.",
+    values: {
+      primaryColor: "#16a34a",
+      sidebarColor: "#052e16",
+      surfaceColor: "#f2fbf5",
+      style: "executive",
+      density: "comfortable",
+    },
+  },
+  {
     id: "city-arena",
     name: "City Arena",
     description: "Modern navy interface for busier operators.",
@@ -67,6 +76,18 @@ const themePresets: ThemePreset[] = [
       sidebarColor: "#0f172a",
       surfaceColor: "#f6f8fc",
       style: "executive",
+      density: "compact",
+    },
+  },
+  {
+    id: "courtside-minimal",
+    name: "Courtside Minimal",
+    description: "Neutral, bright, and restrained for simple operations.",
+    values: {
+      primaryColor: "#0f766e",
+      sidebarColor: "#1f2937",
+      surfaceColor: "#f9fafb",
+      style: "soft",
       density: "compact",
     },
   },
@@ -83,6 +104,30 @@ const themePresets: ThemePreset[] = [
     },
   },
   {
+    id: "sunrise-open",
+    name: "Sunrise Open",
+    description: "Fresh coral and blue accents for morning-heavy venues.",
+    values: {
+      primaryColor: "#f97316",
+      sidebarColor: "#1e3a5f",
+      surfaceColor: "#fff7ed",
+      style: "vivid",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "pacific-court",
+    name: "Pacific Court",
+    description: "Coastal blue with clean surfaces for premium arenas.",
+    values: {
+      primaryColor: "#0284c7",
+      sidebarColor: "#0c2438",
+      surfaceColor: "#f0f9ff",
+      style: "executive",
+      density: "comfortable",
+    },
+  },
+  {
     id: "court-lab",
     name: "Court Lab",
     description: "Crisp teal system for a technical operations feel.",
@@ -91,6 +136,138 @@ const themePresets: ThemePreset[] = [
       sidebarColor: "#123044",
       surfaceColor: "#f4fafb",
       style: "executive",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "carbon-pro",
+    name: "Carbon Pro",
+    description: "Dark graphite navigation with sharp lime highlights.",
+    values: {
+      primaryColor: "#84cc16",
+      sidebarColor: "#111827",
+      surfaceColor: "#f8fafc",
+      style: "executive",
+      density: "compact",
+    },
+  },
+  {
+    id: "royal-indoor",
+    name: "Royal Indoor",
+    description: "Indigo and gold-inspired controls for upscale courts.",
+    values: {
+      primaryColor: "#4f46e5",
+      sidebarColor: "#1e1b4b",
+      surfaceColor: "#f7f7ff",
+      style: "executive",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "clay-and-sky",
+    name: "Clay and Sky",
+    description: "Terracotta with calm blue-gray structure.",
+    values: {
+      primaryColor: "#c2410c",
+      sidebarColor: "#334155",
+      surfaceColor: "#fff7ed",
+      style: "soft",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "night-match",
+    name: "Night Match",
+    description: "Deep midnight shell with electric court accents.",
+    values: {
+      primaryColor: "#06b6d4",
+      sidebarColor: "#020617",
+      surfaceColor: "#f3f8fb",
+      style: "vivid",
+      density: "compact",
+    },
+  },
+  {
+    id: "academy",
+    name: "Academy",
+    description: "Trustworthy blue and slate styling for training centers.",
+    values: {
+      primaryColor: "#2563eb",
+      sidebarColor: "#1e293b",
+      surfaceColor: "#f8fafc",
+      style: "soft",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "wellness-club",
+    name: "Wellness Club",
+    description: "Soft mint and charcoal for approachable community gyms.",
+    values: {
+      primaryColor: "#10b981",
+      sidebarColor: "#1f3a32",
+      surfaceColor: "#f3fbf8",
+      style: "soft",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "fiesta-cup",
+    name: "Fiesta Cup",
+    description: "Bright tournament styling with energetic pink accents.",
+    values: {
+      primaryColor: "#db2777",
+      sidebarColor: "#312e81",
+      surfaceColor: "#fff5f8",
+      style: "vivid",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "halloween-rally",
+    name: "Halloween Rally",
+    description: "Seasonal Halloween look with pumpkin accents and dark shell.",
+    values: {
+      primaryColor: "#f97316",
+      sidebarColor: "#1c1917",
+      surfaceColor: "#fff7ed",
+      style: "vivid",
+      density: "compact",
+    },
+  },
+  {
+    id: "christmas-classic",
+    name: "Christmas Classic",
+    description: "Seasonal Christmas palette with pine and berry tones.",
+    values: {
+      primaryColor: "#dc2626",
+      sidebarColor: "#14532d",
+      surfaceColor: "#f7fbf6",
+      style: "vivid",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "new-year-lights",
+    name: "New Year Lights",
+    description: "Celebration-ready navy with bright gold action color.",
+    values: {
+      primaryColor: "#eab308",
+      sidebarColor: "#0f172a",
+      surfaceColor: "#f8fafc",
+      style: "executive",
+      density: "comfortable",
+    },
+  },
+  {
+    id: "valentine-match",
+    name: "Valentine Match",
+    description: "Seasonal rose theme for promos, events, and doubles nights.",
+    values: {
+      primaryColor: "#e11d48",
+      sidebarColor: "#4c1d2f",
+      surfaceColor: "#fff1f4",
+      style: "soft",
       density: "comfortable",
     },
   },
@@ -135,29 +312,23 @@ const styleOptions: Array<{
   },
 ]
 
-const dashboardPanelOptions: Array<{
-  value: OwnerDashboardPanel
+const navigationLayoutOptions: Array<{
+  value: OwnerNavigationLayout
   label: string
   description: string
-  icon: typeof ListChecks
+  icon: typeof PanelLeft
 }> = [
   {
-    value: "recent-transactions",
-    label: "Recent transactions",
-    description: "Latest bookings that need owner attention.",
-    icon: ListChecks,
+    value: "sidebar",
+    label: "Sidebar",
+    description: "Persistent left navigation with collapse control.",
+    icon: PanelLeft,
   },
   {
-    value: "revenue-chart",
-    label: "Revenue graph",
-    description: "A visual trend from recent paid bookings.",
-    icon: BarChart3,
-  },
-  {
-    value: "booking-mix",
-    label: "Booking mix",
-    description: "Status breakdown for operations review.",
-    icon: ChartPie,
+    value: "navbar",
+    label: "Top navbar",
+    description: "Horizontal navigation below the owner header.",
+    icon: Menu,
   },
 ]
 
@@ -235,6 +406,7 @@ function PresetCard({
   const previewStyle = buildOwnerBrandingStyle({
     brandName: preset.name,
     logoImageUrl: null,
+    navigationLayout: "sidebar",
     dashboardPanels: ["recent-transactions"],
     ...preset.values,
   })
@@ -431,57 +603,6 @@ function WorkspacePreview({
               </div>
             ) : null}
 
-            {draft.dashboardPanels.includes("revenue-chart") ? (
-              <div className="rounded-lg border bg-card p-3">
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <BarChart3
-                    className="size-4 text-primary"
-                    aria-hidden="true"
-                  />
-                  Revenue graph
-                </div>
-                <div className="flex h-24 items-end gap-2">
-                  {[38, 54, 42, 76, 63, 92].map((height, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-1 flex-col items-center gap-1"
-                    >
-                      <span
-                        className="w-full rounded-t bg-primary"
-                        style={{ height: `${height}%` }}
-                      />
-                      <span className="text-[9px] text-muted-foreground">
-                        W{index + 1}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {draft.dashboardPanels.includes("booking-mix") ? (
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Revenue", value: "PHP 42K", icon: WalletCards },
-                  { label: "Pending", value: "8", icon: Receipt },
-                  { label: "Courts", value: "12", icon: Settings2 },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-lg border bg-card p-3"
-                  >
-                    <item.icon
-                      className="size-4 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <p className="mt-2 text-[10px] text-muted-foreground">
-                      {item.label}
-                    </p>
-                    <p className="text-sm font-semibold">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           <footer className="border-t px-4 py-3 text-[11px] text-muted-foreground">
@@ -516,20 +637,6 @@ export function OwnerConfigurationPage() {
     value: OwnerBrandingConfig[K]
   ) {
     setDraft((current) => ({ ...current, [key]: value }))
-  }
-
-  function toggleDashboardPanel(panel: OwnerDashboardPanel) {
-    setDraft((current) => {
-      const enabled = current.dashboardPanels.includes(panel)
-      const nextPanels = enabled
-        ? current.dashboardPanels.filter((item) => item !== panel)
-        : [...current.dashboardPanels, panel]
-
-      return {
-        ...current,
-        dashboardPanels: nextPanels.length > 0 ? nextPanels : [panel],
-      }
-    })
   }
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -688,44 +795,46 @@ export function OwnerConfigurationPage() {
 
           <Card className="rounded-lg">
             <CardHeader>
-              <CardTitle>Dashboard content</CardTitle>
+              <CardTitle>Navigation layout</CardTitle>
               <CardDescription>
-                Choose one or more panels shown below the dashboard metrics.
+                Choose how owners move around the management workspace.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
-              {dashboardPanelOptions.map((option) => {
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {navigationLayoutOptions.map((option) => {
                 const OptionIcon = option.icon
-                const selected = draft.dashboardPanels.includes(option.value)
+                const selected = draft.navigationLayout === option.value
 
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => toggleDashboardPanel(option.value)}
+                    onClick={() =>
+                      updateDraft("navigationLayout", option.value)
+                    }
                     className={cn(
-                      "grid gap-3 rounded-lg border bg-card p-4 text-left transition hover:border-primary/50 hover:bg-muted/25",
+                      "flex items-start gap-3 rounded-lg border bg-card p-4 text-left transition hover:border-primary/50 hover:bg-muted/25",
                       selected &&
                         "border-primary bg-primary/5 ring-1 ring-primary/25"
                     )}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex size-10 items-center justify-center rounded-md bg-primary/10 text-primary">
-                        <OptionIcon className="size-5" aria-hidden="true" />
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <OptionIcon className="size-5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="font-medium">{option.label}</span>
+                        {selected ? (
+                          <Check
+                            className="size-4 text-primary"
+                            aria-hidden="true"
+                          />
+                        ) : null}
                       </span>
-                      {selected ? (
-                        <Check
-                          className="size-4 text-primary"
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                    </div>
-                    <div>
-                      <p className="font-medium">{option.label}</p>
-                      <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                      <span className="mt-1 block text-sm leading-5 text-muted-foreground">
                         {option.description}
-                      </p>
-                    </div>
+                      </span>
+                    </span>
                   </button>
                 )
               })}

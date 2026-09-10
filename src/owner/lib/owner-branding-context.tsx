@@ -2,12 +2,18 @@
 import * as React from "react"
 
 import { persistStorageItem, readStorageItem } from "@/lib/auth-storage"
+import {
+  getOwnerBrandingWithApi,
+  updateOwnerBrandingWithApi,
+  type OwnerBrandingApiInput,
+  type OwnerBrandingApiResponse,
+} from "@/lib/owner-api"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 
 export type OwnerBrandingDensity = "comfortable" | "compact"
 export type OwnerBrandingStyle = "soft" | "vivid" | "executive"
-export type OwnerDashboardPanel =
-  "recent-transactions" | "revenue-chart" | "booking-mix"
+export type OwnerDashboardPanel = "recent-transactions"
+export type OwnerNavigationLayout = "sidebar" | "navbar"
 
 export type OwnerBrandingConfig = {
   brandName: string
@@ -17,6 +23,7 @@ export type OwnerBrandingConfig = {
   surfaceColor: string
   density: OwnerBrandingDensity
   style: OwnerBrandingStyle
+  navigationLayout: OwnerNavigationLayout
   dashboardPanels: OwnerDashboardPanel[]
 }
 
@@ -58,12 +65,12 @@ function isStyle(value: unknown): value is OwnerBrandingStyle {
   return value === "soft" || value === "vivid" || value === "executive"
 }
 
+function isNavigationLayout(value: unknown): value is OwnerNavigationLayout {
+  return value === "sidebar" || value === "navbar"
+}
+
 function isDashboardPanel(value: unknown): value is OwnerDashboardPanel {
-  return (
-    value === "recent-transactions" ||
-    value === "revenue-chart" ||
-    value === "booking-mix"
-  )
+  return value === "recent-transactions"
 }
 
 function getDashboardPanels(value: unknown): OwnerDashboardPanel[] {
@@ -151,6 +158,7 @@ function createDefaultBranding(ownerName: string): OwnerBrandingConfig {
     surfaceColor: DEFAULT_SURFACE,
     density: "comfortable",
     style: "soft",
+    navigationLayout: "sidebar",
     dashboardPanels: ["recent-transactions"],
   }
 }
@@ -178,6 +186,14 @@ function sanitizeBranding(
     ),
     density: candidate.density,
     style: candidate.style,
+    navigationLayout: isNavigationLayout(
+      (candidate as OwnerBrandingConfig & { navigationLayout?: unknown })
+        .navigationLayout
+    )
+      ? (candidate as OwnerBrandingConfig & {
+          navigationLayout: OwnerNavigationLayout
+        }).navigationLayout
+      : fallback.navigationLayout,
     dashboardPanels: getDashboardPanels(
       (candidate as OwnerBrandingConfig & { dashboardPanel?: unknown })
         .dashboardPanels ??
@@ -186,6 +202,52 @@ function sanitizeBranding(
         fallback.dashboardPanels
     ),
   }
+}
+
+export function mapOwnerBrandingApiToConfig(
+  payload: OwnerBrandingApiResponse,
+  ownerName = "Owner"
+): OwnerBrandingConfig {
+  return sanitizeBranding(
+    {
+      brandName: payload.brand_name,
+      logoImageUrl: payload.logo_image_url,
+      primaryColor: payload.primary_color,
+      sidebarColor: payload.sidebar_color,
+      surfaceColor: payload.surface_color,
+      density: payload.density,
+      style: payload.style,
+      navigationLayout: payload.navigation_layout,
+      dashboardPanels: payload.dashboard_panels,
+    },
+    ownerName
+  )
+}
+
+function mapOwnerBrandingConfigToApi(
+  config: OwnerBrandingConfig
+): OwnerBrandingApiInput {
+  return {
+    brand_name: config.brandName,
+    logo_image_url: config.logoImageUrl,
+    primary_color: config.primaryColor,
+    sidebar_color: config.sidebarColor,
+    surface_color: config.surfaceColor,
+    density: config.density,
+    style: config.style,
+    navigation_layout: config.navigationLayout,
+    dashboard_panels: config.dashboardPanels,
+  }
+}
+
+export function readStoredOwnerBranding(
+  ownerId: string,
+  ownerName = "Owner"
+) {
+  const fallback = createDefaultBranding(ownerName)
+  const stored = readStorageItem(storageKeyForOwner(ownerId), isOwnerBrandingConfig)
+
+  return stored ? sanitizeBranding(stored, ownerName) : fallback
 }
 
 export function buildOwnerBrandingStyle(
@@ -283,13 +345,46 @@ export function OwnerBrandingProvider({
       return
     }
 
+    let isActive = true
     const fallback = createDefaultBranding(owner.name)
     const stored = readStorageItem(
       storageKeyForOwner(owner.id),
       isOwnerBrandingConfig
     )
 
-    setBrandingState(stored ? sanitizeBranding(stored, owner.name) : fallback)
+    const initialBranding = stored ? sanitizeBranding(stored, owner.name) : fallback
+    setBrandingState(initialBranding)
+
+    const ownerToken = owner.token
+    if (ownerToken) {
+      void getOwnerBrandingWithApi(ownerToken)
+        .then((payload) => {
+          if (!isActive) {
+            return
+          }
+
+          if (!payload.is_customized && stored) {
+            void updateOwnerBrandingWithApi(
+              ownerToken,
+              mapOwnerBrandingConfigToApi(initialBranding)
+            ).catch(() => {
+              // Keep the locally stored prototype branding if the API is unavailable.
+            })
+            return
+          }
+
+          const syncedBranding = mapOwnerBrandingApiToConfig(payload, owner.name)
+          persistStorageItem(storageKeyForOwner(owner.id), syncedBranding)
+          setBrandingState(syncedBranding)
+        })
+        .catch(() => {
+          // Keep the locally stored prototype branding if the API is unavailable.
+        })
+    }
+
+    return () => {
+      isActive = false
+    }
   }, [owner])
 
   const setBranding = React.useCallback<
@@ -306,6 +401,14 @@ export function OwnerBrandingProvider({
         const sanitized = sanitizeBranding(resolved, owner.name)
 
         persistStorageItem(storageKeyForOwner(owner.id), sanitized)
+        if (owner.token) {
+          void updateOwnerBrandingWithApi(
+            owner.token,
+            mapOwnerBrandingConfigToApi(sanitized)
+          ).catch(() => {
+            // Local branding remains usable even if the backend save fails.
+          })
+        }
         return sanitized
       })
     },
@@ -319,6 +422,14 @@ export function OwnerBrandingProvider({
 
     const fallback = createDefaultBranding(owner.name)
     persistStorageItem(storageKeyForOwner(owner.id), fallback)
+    if (owner.token) {
+      void updateOwnerBrandingWithApi(
+        owner.token,
+        mapOwnerBrandingConfigToApi(fallback)
+      ).catch(() => {
+        // Local branding remains usable even if the backend save fails.
+      })
+    }
     setBrandingState(fallback)
   }, [owner])
 

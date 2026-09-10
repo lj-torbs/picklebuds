@@ -26,6 +26,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { formatCurrency, pesoSymbol } from "@/lib/currency"
 import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
+import { mapOwnerBrandingApiToConfig } from "@/owner/lib/owner-branding-context"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
 
@@ -143,6 +144,9 @@ function mapVenueDetailToGym(venue: VenueDetailApiResponse): Gym {
   return {
     id: venue.public_id,
     ownerId: venue.owner_public_id,
+    ownerBranding: venue.owner_branding
+      ? mapOwnerBrandingApiToConfig(venue.owner_branding, venue.name)
+      : undefined,
     name: venue.name,
     address: venue.address,
     phone: venue.phone ?? "",

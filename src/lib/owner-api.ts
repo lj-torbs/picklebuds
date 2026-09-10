@@ -56,9 +56,28 @@ export type OwnerDashboardApiResponse = {
   recent_transactions: OwnerTransactionApiItem[]
 }
 
+export type OwnerBrandingApiResponse = {
+  brand_name: string
+  logo_image_url: string | null
+  primary_color: string
+  sidebar_color: string
+  surface_color: string
+  density: "comfortable" | "compact"
+  style: "soft" | "vivid" | "executive"
+  navigation_layout: "sidebar" | "navbar"
+  dashboard_panels: Array<"recent-transactions">
+  is_customized: boolean
+}
+
+export type OwnerBrandingApiInput = Omit<
+  OwnerBrandingApiResponse,
+  "is_customized"
+>
+
 export type OwnerVenueApiResponse = {
   public_id: string
   owner_public_id: string
+  owner_branding: OwnerBrandingApiResponse | null
   name: string
   address: string
   phone: string | null
@@ -159,6 +178,36 @@ export async function getOwnerTransactionsWithApi(token: string) {
   )
 
   return payload.items
+}
+
+export async function getOwnerBrandingWithApi(token: string) {
+  const response = await fetch(`${API_BASE_URL}/owners/branding`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  return parseApiResponse<OwnerBrandingApiResponse>(
+    response,
+    "Unable to load owner branding right now."
+  )
+}
+
+export async function updateOwnerBrandingWithApi(
+  token: string,
+  input: OwnerBrandingApiInput
+) {
+  const response = await fetch(`${API_BASE_URL}/owners/branding`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+
+  return parseApiResponse<OwnerBrandingApiResponse>(
+    response,
+    "Unable to update owner branding right now."
+  )
 }
 
 export type OwnerVenueUpsertInput = {

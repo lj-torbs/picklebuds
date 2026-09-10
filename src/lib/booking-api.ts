@@ -1,4 +1,5 @@
 import { AuthApiError } from "@/lib/auth-api"
+import type { OwnerBrandingApiResponse } from "@/lib/owner-api"
 import type { BookingRental } from "@/shared/lib/gyms-context"
 import type { PaymentReceipt } from "@/shared/lib/payment-receipt"
 
@@ -137,6 +138,7 @@ export type VenueWholeGymBookingApiResponse = {
 export type VenueDetailApiResponse = {
   public_id: string
   owner_public_id: string
+  owner_branding: OwnerBrandingApiResponse | null
   name: string
   address: string
   phone: string | null

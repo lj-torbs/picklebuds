@@ -1,7 +1,11 @@
-import { Bell, LogOut, Menu } from "lucide-react"
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Bell, CalendarCheck, LogOut, Menu } from "lucide-react"
+import { useState } from "react"
+import { Link, Outlet, useNavigate } from "react-router-dom"
 
-import { OwnerSidebar } from "@/owner/components/layout/owner-sidebar"
+import {
+  OwnerHeaderNav,
+  OwnerSidebar,
+} from "@/owner/components/layout/owner-sidebar"
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import {
   buildOwnerBrandingStyle,
@@ -19,38 +23,15 @@ import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import { useNotifications } from "@/shared/lib/use-notifications"
 
-const pageTitles: Record<string, string> = {
-  "/owner/dashboard": "Dashboard",
-  "/owner/gyms": "My Gyms",
-  "/owner/gyms/new": "Add Gym",
-  "/owner/payment-methods": "Payment Methods",
-  "/owner/transactions": "Transactions",
-  "/owner/notifications": "Notifications",
-  "/owner/configuration": "Configuration",
-}
-
-function resolveTitle(pathname: string) {
-  if (pageTitles[pathname]) {
-    return pageTitles[pathname]
-  }
-
-  // /owner/gyms/:gymId/edit
-  if (pathname.startsWith("/owner/gyms/") && pathname.endsWith("/edit")) {
-    return "Edit Gym"
-  }
-
-  return "Owner"
-}
-
 export function OwnerShell() {
   const { owner, logout } = useOwnerAuth()
-  const { branding } = useOwnerBranding()
+  const { branding, brandLabel } = useOwnerBranding()
   const toast = useToast()
-  const location = useLocation()
   const navigate = useNavigate()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-  const title = resolveTitle(location.pathname)
   const shellStyle = buildOwnerBrandingStyle(branding)
+  const usesSidebar = branding.navigationLayout === "sidebar"
   const { unreadCount } = useNotifications({
     token: owner?.token,
     intervalMs: 10000,
@@ -71,11 +52,25 @@ export function OwnerShell() {
   return (
     <div
       style={shellStyle}
-      className="min-h-svh bg-background lg:grid lg:grid-cols-[17rem_1fr]"
+      className={cn(
+        "min-h-svh bg-background",
+        usesSidebar &&
+          !sidebarCollapsed &&
+          "lg:grid lg:grid-cols-[17rem_1fr]",
+        usesSidebar &&
+          sidebarCollapsed &&
+          "lg:grid lg:grid-cols-[4.5rem_1fr]"
+      )}
     >
-      <aside className="hidden lg:block">
-        <OwnerSidebar unreadNotifications={unreadCount} />
-      </aside>
+      {usesSidebar ? (
+        <aside className="hidden lg:block">
+          <OwnerSidebar
+            collapsed={sidebarCollapsed}
+            onCollapsedChange={setSidebarCollapsed}
+            unreadNotifications={unreadCount}
+          />
+        </aside>
+      ) : null}
 
       <div className="flex min-h-svh min-w-0 flex-col">
         <header className="relative flex min-h-16 items-center gap-3 border-b bg-card px-4 py-3 shadow-sm before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-primary sm:px-6">
@@ -98,9 +93,38 @@ export function OwnerShell() {
             </SheetContent>
           </Sheet>
 
-          <h1 className="min-w-0 truncate text-lg font-semibold">{title}</h1>
+          {!usesSidebar ? (
+            <Link
+              to="/owner/dashboard"
+              className="flex min-w-0 shrink-0 items-center gap-2.5"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary text-primary-foreground shadow-xs">
+                {branding.logoImageUrl ? (
+                  <img
+                    src={branding.logoImageUrl}
+                    alt={`${brandLabel} logo`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <CalendarCheck className="size-4" aria-hidden="true" />
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block max-w-44 truncate text-sm font-semibold leading-tight sm:max-w-56">
+                  {brandLabel}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  Owner workspace
+                </span>
+              </span>
+            </Link>
+          ) : null}
 
-          <div className="ml-auto flex items-center gap-3">
+          {!usesSidebar ? (
+            <OwnerHeaderNav unreadNotifications={unreadCount} />
+          ) : null}
+
+          <div className="ml-auto flex shrink-0 items-center gap-3">
             <Link
               to="/owner/notifications"
               className={cn(

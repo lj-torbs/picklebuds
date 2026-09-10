@@ -7,7 +7,6 @@ import type {
   GymPaymentSetup,
   PaymentProvider,
 } from "@/shared/lib/gyms-context"
-import { placeholderQr } from "@/shared/lib/placeholder-image"
 
 export type OwnerPaymentMethod = GymPaymentSetup & {
   id: string
@@ -81,35 +80,6 @@ function createMethodId(label: string) {
   return `${slug}-${Date.now().toString(36)}`
 }
 
-function createDefaultPaymentMethods(ownerName: string): OwnerPaymentMethod[] {
-  const accountName = ownerName || "Venue Owner"
-
-  return [
-    {
-      id: "owner-gcash",
-      provider: "GCash",
-      displayName: "Main GCash",
-      accountName,
-      accountNumber: "0917 123 4567",
-      instructions: "Send the exact booking amount before uploading proof.",
-      qrCodeImageUrl: placeholderQr(`${accountName} GCash`),
-      qrCodeFileName: "owner-gcash-qr.png",
-      isActive: true,
-    },
-    {
-      id: "owner-bank-transfer",
-      provider: "Bank Transfer",
-      displayName: "Main bank account",
-      accountName,
-      accountNumber: "BDO 0000 1111 2222",
-      instructions: "Use the booking reference as the transfer note.",
-      qrCodeImageUrl: placeholderQr(`${accountName} Bank`),
-      qrCodeFileName: "owner-bank-qr.png",
-      isActive: true,
-    },
-  ]
-}
-
 function normalizePaymentMethod(
   method: OwnerPaymentMethodInput
 ): OwnerPaymentMethodInput {
@@ -157,12 +127,12 @@ export function OwnerPaymentMethodsProvider({
   const { owner } = useOwnerAuth()
   const [paymentMethods, setPaymentMethodsState] = React.useState<
     OwnerPaymentMethod[]
-  >(() => createDefaultPaymentMethods("Venue Owner"))
+  >([])
 
   React.useEffect(() => {
     if (!owner) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Payment library follows the active owner session.
-      setPaymentMethodsState(createDefaultPaymentMethods("Venue Owner"))
+      setPaymentMethodsState([])
       return
     }
 
@@ -170,7 +140,7 @@ export function OwnerPaymentMethodsProvider({
       storageKeyForOwner(owner.id),
       isOwnerPaymentMethodArray
     )
-    setPaymentMethodsState(stored ?? createDefaultPaymentMethods(owner.name))
+    setPaymentMethodsState(stored ?? [])
   }, [owner])
 
   const persistForOwner = React.useCallback(

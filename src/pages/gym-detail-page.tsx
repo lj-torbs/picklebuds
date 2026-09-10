@@ -56,6 +56,11 @@ import {
   GymStatusBadge,
 } from "@/shared/components/gyms/gym-status-badge"
 import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
+import {
+  buildOwnerBrandingStyle,
+  mapOwnerBrandingApiToConfig,
+  readStoredOwnerBranding,
+} from "@/owner/lib/owner-branding-context"
 import type {
   BookingRental,
   Gym,
@@ -175,6 +180,9 @@ function mapVenueDetailToGym(venue: VenueDetailApiResponse): Gym {
   return {
     id: venue.public_id,
     ownerId: venue.owner_public_id,
+    ownerBranding: venue.owner_branding
+      ? mapOwnerBrandingApiToConfig(venue.owner_branding, venue.name)
+      : undefined,
     name: venue.name,
     address: venue.address,
     phone: venue.phone ?? "",
@@ -254,6 +262,16 @@ export function GymDetailPage() {
   const weekStart = week[0]?.value ?? formatLocalDate(new Date())
 
   const gym = remoteGym ?? fallbackGym
+  const venueBranding = useMemo(
+    () =>
+      gym?.ownerBranding ??
+      (gym?.ownerId ? readStoredOwnerBranding(gym.ownerId, gym.name) : null),
+    [gym?.name, gym?.ownerBranding, gym?.ownerId]
+  )
+  const venueBrandingStyle = useMemo(
+    () => (venueBranding ? buildOwnerBrandingStyle(venueBranding) : undefined),
+    [venueBranding]
+  )
 
   const [selectedCourtId, setSelectedCourtId] = useState<string | undefined>(
     () => searchParams.get("court") ?? undefined
@@ -947,7 +965,7 @@ export function GymDetailPage() {
   const estimatedTotal = courtChargeTotal + rentalTotal
 
   return (
-    <main className="min-h-svh bg-muted/30">
+    <main className="min-h-svh bg-muted/30" style={venueBrandingStyle}>
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/booking" className="flex items-center gap-3">

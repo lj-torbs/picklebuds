@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
+import type { OwnerBrandingConfig } from "@/owner/lib/owner-branding-context"
 import { placeholderPhoto, placeholderQr } from "@/shared/lib/placeholder-image"
 
 export type GymStatus = "active" | "inactive"
@@ -85,6 +86,7 @@ export type Court = {
 export type Gym = {
   id: string
   ownerId: string
+  ownerBranding?: OwnerBrandingConfig
   name: string
   address: string
   phone: string
