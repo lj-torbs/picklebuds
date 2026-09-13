@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarClock,
   ChevronDown,
+  Copy,
   CreditCard,
   Loader2,
   MapPin,
@@ -332,6 +333,55 @@ export function OwnerGymsPage() {
     return gym.courts.filter(courtMatchesQuery)
   }
 
+  function buildBookingLink(
+    gymId?: string,
+    options?: { courtId?: string; scope?: "whole-gym" }
+  ) {
+    if (!owner?.id || typeof window === "undefined") {
+      return ""
+    }
+
+    const path = gymId ? `/book/${owner.id}/${gymId}` : `/book/${owner.id}`
+    const params = new URLSearchParams()
+
+    if (options?.courtId) {
+      params.set("court", options.courtId)
+    }
+
+    if (options?.scope) {
+      params.set("scope", options.scope)
+    }
+
+    const query = params.toString()
+    return `${window.location.origin}${path}${query ? `?${query}` : ""}`
+  }
+
+  async function copyBookingLink(label: string, url: string) {
+    if (!url) {
+      toast.add({
+        title: "Unable to copy link",
+        description: "Your owner booking page is not available yet.",
+        type: "error",
+      })
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.add({
+        title: "Booking link copied",
+        description: `${label} is ready to share.`,
+        type: "success",
+      })
+    } catch {
+      toast.add({
+        title: "Unable to copy link",
+        description: "Please copy it again from a secure browser window.",
+        type: "error",
+      })
+    }
+  }
+
   const filteredGyms = useMemo(
     () =>
       gyms.filter(
@@ -397,10 +447,23 @@ export function OwnerGymsPage() {
                 placeholder="Search gyms or courts"
               />
             </div>
-            <span className="text-sm text-muted-foreground">
-              {filteredGyms.length} of {gyms.length} venue
-              {gyms.length === 1 ? "" : "s"}
-            </span>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  copyBookingLink("Your owner booking page", buildBookingLink())
+                }
+              >
+                <Copy className="size-4" aria-hidden="true" />
+                Copy owner link
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {filteredGyms.length} of {gyms.length} venue
+                {gyms.length === 1 ? "" : "s"}
+              </span>
+            </div>
           </div>
           <CardContent className="p-0">
             {filteredGyms.length === 0 ? (
@@ -591,6 +654,21 @@ export function OwnerGymsPage() {
                                 type="button"
                                 variant="ghost"
                                 size="icon-sm"
+                                aria-label={`Copy booking link for ${gym.name}`}
+                                title={`Copy booking link for ${gym.name}`}
+                                onClick={() =>
+                                  copyBookingLink(
+                                    `${gym.name} booking page`,
+                                    buildBookingLink(gym.id)
+                                  )
+                                }
+                              >
+                                <Copy className="size-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
                                 aria-label={`Edit ${gym.name}`}
                                 onClick={() => {
                                   setConfirmingRemoveGymId(null)
@@ -774,6 +852,26 @@ export function OwnerGymsPage() {
                                                   {court.status === "available"
                                                     ? "Maintenance"
                                                     : "Available"}
+                                                </Button>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="icon-sm"
+                                                  aria-label={`Copy direct booking link for ${court.name}`}
+                                                  title={`Copy direct booking link for ${court.name}`}
+                                                  onClick={() =>
+                                                    copyBookingLink(
+                                                      `${court.name} direct booking link`,
+                                                      buildBookingLink(gym.id, {
+                                                        courtId: court.id,
+                                                      })
+                                                    )
+                                                  }
+                                                >
+                                                  <Copy
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                  />
                                                 </Button>
                                                 <Button
                                                   type="button"

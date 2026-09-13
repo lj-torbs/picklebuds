@@ -2,20 +2,13 @@ import { useEffect, useMemo, useState } from "react"
 import {
   CalendarClock,
   CheckCircle2,
-  Copy,
   DollarSign,
-  ExternalLink,
   ListChecks,
   ReceiptText,
   XCircle,
 } from "lucide-react"
-import { Link } from "react-router-dom"
 
-import { Button } from "@/components/ui/button"
-import { buttonVariants } from "@/components/ui/button-variants"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/toast"
 import {
   getOwnerDashboardWithApi,
   type OwnerTransactionApiItem,
@@ -54,7 +47,6 @@ const timeFormatter = new Intl.DateTimeFormat("en-PH", {
 export function OwnerDashboardPage() {
   const { owner } = useOwnerAuth()
   const { branding } = useOwnerBranding()
-  const toast = useToast()
   const [dashboard, setDashboard] = useState<DashboardState>({
     revenue: 0,
     pending: 0,
@@ -177,34 +169,6 @@ export function OwnerDashboardPage() {
   const showRecentTransactions = branding.dashboardPanels.includes(
     "recent-transactions"
   )
-  const publicBookingUrl = useMemo(() => {
-    if (!owner?.id) {
-      return ""
-    }
-
-    return `${window.location.origin}/book/${owner.id}`
-  }, [owner?.id])
-
-  async function handleCopyBookingLink() {
-    if (!publicBookingUrl) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(publicBookingUrl)
-      toast.add({
-        title: "Booking link copied",
-        description: "You can paste it on Facebook, Instagram, TikTok, or your website.",
-        type: "success",
-      })
-    } catch {
-      toast.add({
-        title: "Unable to copy link",
-        description: publicBookingUrl,
-        type: "error",
-      })
-    }
-  }
 
   return (
     <div className="grid gap-4">
@@ -232,43 +196,6 @@ export function OwnerDashboardPage() {
           {error}
         </p>
       ) : null}
-
-      <Card className="rounded-lg">
-        <CardContent className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Public booking link</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Share this link on social media so players book directly with your venues.
-            </p>
-            <Input
-              className="mt-3"
-              readOnly
-              value={publicBookingUrl}
-              aria-label="Public booking link"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleCopyBookingLink()}
-              disabled={!publicBookingUrl}
-            >
-              <Copy className="size-4" aria-hidden="true" />
-              Copy link
-            </Button>
-            {publicBookingUrl ? (
-              <Link
-                to={`/book/${owner?.id}`}
-                className={buttonVariants({ variant: "outline" })}
-              >
-                <ExternalLink className="size-4" aria-hidden="true" />
-                Open
-              </Link>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
 
       <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
