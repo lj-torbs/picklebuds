@@ -7,7 +7,14 @@ export function RequireAuth() {
   const location = useLocation()
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location }} />
+    const redirect = `${location.pathname}${location.search}${location.hash}`
+    return (
+      <Navigate
+        to={`/login?redirect=${encodeURIComponent(redirect)}`}
+        replace
+        state={{ from: location }}
+      />
+    )
   }
 
   return <Outlet />

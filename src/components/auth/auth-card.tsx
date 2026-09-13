@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { CalendarCheck, Eye, EyeOff, Mail, UserRound } from "lucide-react"
-import { Link, useLocation, useNavigate } from "react-router-dom"
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import type { z } from "zod"
 
 import { Button } from "@/components/ui/button"
@@ -74,6 +74,7 @@ export function AuthCard({ mode }: AuthCardProps) {
   const { login, signup } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -93,9 +94,38 @@ export function AuthCard({ mode }: AuthCardProps) {
     confirmPassword.length > 0 &&
     password !== confirmPassword
 
+  const redirectParam = searchParams.get("redirect")
+
+  function getSafeRedirectTarget() {
+    if (
+      redirectParam &&
+      redirectParam.startsWith("/") &&
+      !redirectParam.startsWith("//")
+    ) {
+      return redirectParam
+    }
+
+    const state = location.state as {
+      from?: { pathname?: string; search?: string; hash?: string }
+    } | null
+    const fromPath = state?.from?.pathname
+
+    if (fromPath && fromPath.startsWith("/") && !fromPath.startsWith("//")) {
+      return `${fromPath}${state?.from?.search ?? ""}${state?.from?.hash ?? ""}`
+    }
+
+    return "/booking"
+  }
+
+  function getAuthLink(path: string) {
+    const target = getSafeRedirectTarget()
+    return target === "/booking"
+      ? path
+      : `${path}?redirect=${encodeURIComponent(target)}`
+  }
+
   function goToDestination() {
-    const state = location.state as { from?: { pathname?: string } } | null
-    navigate(state?.from?.pathname ?? "/booking", { replace: true })
+    navigate(getSafeRedirectTarget(), { replace: true })
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -485,7 +515,7 @@ export function AuthCard({ mode }: AuthCardProps) {
               {copy.footer}{" "}
               <Link
                 className="font-medium text-foreground underline-offset-4 hover:underline"
-                to={copy.footerHref}
+                to={getAuthLink(copy.footerHref)}
               >
                 {copy.footerLink}
               </Link>

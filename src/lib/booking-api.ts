@@ -9,6 +9,7 @@ const API_BASE_URL =
 
 export type CreatePrivateBookingInput = {
   token: string
+  expectedOwnerPublicId?: string
   venuePublicId: string
   courtPublicId: string | null
   bookingType: "private" | "open_play" | "whole_gym"
@@ -166,6 +167,16 @@ export type VenueListApiResponse = {
   items: VenueListItemApiResponse[]
 }
 
+export type PublicOwnerBookingApiResponse = {
+  owner_public_id: string
+  owner_name: string
+  business_name: string | null
+  status: "active" | "inactive" | "suspended"
+  is_available: boolean
+  owner_branding: OwnerBrandingApiResponse | null
+  venues: VenueListItemApiResponse[]
+}
+
 export type VenueAvailabilityItemApiResponse = {
   date: string
   slot_label: string
@@ -205,6 +216,7 @@ export async function createPrivateBookingWithApi(
       Authorization: `Bearer ${input.token}`,
     },
     body: JSON.stringify({
+      expected_owner_public_id: input.expectedOwnerPublicId ?? null,
       venue_public_id: input.venuePublicId,
       court_public_id: input.courtPublicId,
       booking_type: input.bookingType,
@@ -428,6 +440,29 @@ export async function getVenuesWithApi() {
   return (payload as VenueListApiResponse).items
 }
 
+export async function getPublicOwnerBookingPageWithApi(ownerPublicId: string) {
+  const response = await fetch(`${API_BASE_URL}/venues/owner/${ownerPublicId}`)
+
+  let payload: PublicOwnerBookingApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Owner booking page was not found.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as PublicOwnerBookingApiResponse
+}
+
 export async function getVenueDetailWithApi(venuePublicId: string) {
   const response = await fetch(`${API_BASE_URL}/venues/${venuePublicId}`)
 
@@ -442,6 +477,34 @@ export async function getVenueDetailWithApi(venuePublicId: string) {
     throw new AuthApiError(
       (payload && "detail" in payload && payload.detail) ||
         "Unable to load venue details right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as VenueDetailApiResponse
+}
+
+export async function getOwnerVenueDetailWithApi(
+  ownerPublicId: string,
+  venuePublicId: string
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/venues/owner/${ownerPublicId}/${venuePublicId}`
+  )
+
+  let payload: VenueDetailApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to load venue details for this owner.",
       response.status,
       undefined,
       payload && "detail" in payload ? payload.detail : undefined
@@ -475,6 +538,40 @@ export async function getVenueAvailabilityWithApi(
     throw new AuthApiError(
       (payload && "detail" in payload && payload.detail) ||
         "Unable to load venue availability right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as VenueAvailabilityApiResponse
+}
+
+export async function getOwnerVenueAvailabilityWithApi(
+  ownerPublicId: string,
+  venuePublicId: string,
+  dateFrom: string,
+  days: number
+) {
+  const searchParams = new URLSearchParams({
+    date_from: dateFrom,
+    days: String(days),
+  })
+  const response = await fetch(
+    `${API_BASE_URL}/venues/owner/${ownerPublicId}/${venuePublicId}/availability?${searchParams.toString()}`
+  )
+
+  let payload: VenueAvailabilityApiResponse | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to load venue availability for this owner.",
       response.status,
       undefined,
       payload && "detail" in payload ? payload.detail : undefined

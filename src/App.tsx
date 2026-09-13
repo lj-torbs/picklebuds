@@ -26,6 +26,7 @@ import { LoginPage } from "@/pages/login-page"
 import { MyBookingsPage } from "@/pages/my-bookings-page"
 import { NotificationsPage } from "@/pages/notifications-page"
 import { OpenPlayPage } from "@/pages/open-play-page"
+import { OwnerPublicBookingPage } from "@/pages/owner-public-booking-page"
 import { PasaloPage } from "@/pages/pasalo-page"
 import { ProfilePage } from "@/pages/profile-page"
 import { SignupPage } from "@/pages/signup-page"
@@ -40,6 +41,8 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route path="/booking" element={<BookingPage />} />
         <Route path="/booking/:gymId" element={<GymDetailPage />} />
+        <Route path="/book/:ownerSlug" element={<OwnerPublicBookingPage />} />
+        <Route path="/book/:ownerSlug/:gymId" element={<GymDetailPage />} />
         <Route path="/open-play" element={<OpenPlayPage />} />
         <Route path="/pasalo" element={<PasaloPage />} />
         <Route path="/my-bookings" element={<MyBookingsPage />} />

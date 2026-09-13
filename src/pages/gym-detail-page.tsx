@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom"
 import {
   ArrowLeft,
   Building2,
@@ -36,6 +42,8 @@ import { useToast } from "@/components/ui/toast"
 import { AuthApiError, getAuthErrorMessage } from "@/lib/auth-api"
 import {
   createPrivateBookingWithApi,
+  getOwnerVenueAvailabilityWithApi,
+  getOwnerVenueDetailWithApi,
   getVenueAvailabilityWithApi,
   getVenueDetailWithApi,
   type VenueAvailabilityApiResponse,
@@ -231,9 +239,13 @@ function mapVenueDetailToGym(venue: VenueDetailApiResponse): Gym {
 }
 
 export function GymDetailPage() {
-  const { gymId } = useParams<{ gymId: string }>()
+  const { gymId, ownerSlug } = useParams<{
+    gymId: string
+    ownerSlug?: string
+  }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { gyms } = useGyms()
   const {
     addBooking,
@@ -244,8 +256,11 @@ export function GymDetailPage() {
   const toast = useToast()
 
   const fallbackGym = useMemo(
-    () => gyms.find((candidate) => candidate.id === gymId),
-    [gyms, gymId]
+    () =>
+      ownerSlug
+        ? undefined
+        : gyms.find((candidate) => candidate.id === gymId),
+    [gyms, gymId, ownerSlug]
   )
   const [remoteGym, setRemoteGym] = useState<Gym | null>(null)
   const [remoteAvailability, setRemoteAvailability] =
@@ -317,8 +332,17 @@ export function GymDetailPage() {
     let isActive = true
 
     void Promise.all([
-      getVenueDetailWithApi(gymId),
-      getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW),
+      ownerSlug
+        ? getOwnerVenueDetailWithApi(ownerSlug, gymId)
+        : getVenueDetailWithApi(gymId),
+      ownerSlug
+        ? getOwnerVenueAvailabilityWithApi(
+            ownerSlug,
+            gymId,
+            weekStart,
+            DAYS_IN_VIEW
+          )
+        : getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW),
     ])
       .then(([venueDetail, venueAvailability]) => {
         if (!isActive) {
@@ -350,7 +374,7 @@ export function GymDetailPage() {
     return () => {
       isActive = false
     }
-  }, [gymId, weekStart])
+  }, [gymId, ownerSlug, weekStart])
 
   const resolvedSelectedCourtId =
     selectedCourtId && gym?.courts.some((court) => court.id === selectedCourtId)
@@ -634,7 +658,8 @@ export function GymDetailPage() {
       description: "Please sign in again before submitting your booking.",
       type: "error",
     })
-    navigate("/login", { replace: true })
+    const redirect = `${location.pathname}${location.search}${location.hash}`
+    navigate(`/login?redirect=${encodeURIComponent(redirect)}`, { replace: true })
     return true
   }
 
@@ -684,6 +709,7 @@ export function GymDetailPage() {
 
           const createdBooking = await createPrivateBookingWithApi({
             token: user.token,
+            expectedOwnerPublicId: ownerSlug,
             venuePublicId: gym.id,
             courtPublicId: null,
             bookingType: "whole_gym",
@@ -741,7 +767,16 @@ export function GymDetailPage() {
         }
 
         if (gymId) {
-          void getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
+          const availabilityRequest = ownerSlug
+            ? getOwnerVenueAvailabilityWithApi(
+                ownerSlug,
+                gymId,
+                weekStart,
+                DAYS_IN_VIEW
+              )
+            : getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
+
+          void availabilityRequest
             .then((availability) => {
               setRemoteAvailability(availability)
             })
@@ -790,6 +825,7 @@ export function GymDetailPage() {
 
           const createdBooking = await createPrivateBookingWithApi({
             token: user.token,
+            expectedOwnerPublicId: ownerSlug,
             venuePublicId: gym.id,
             courtPublicId: selection.court.id,
             bookingType:
@@ -850,7 +886,16 @@ export function GymDetailPage() {
         }
 
         if (gymId) {
-          void getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
+          const availabilityRequest = ownerSlug
+            ? getOwnerVenueAvailabilityWithApi(
+                ownerSlug,
+                gymId,
+                weekStart,
+                DAYS_IN_VIEW
+              )
+            : getVenueAvailabilityWithApi(gymId, weekStart, DAYS_IN_VIEW)
+
+          void availabilityRequest
             .then((availability) => {
               setRemoteAvailability(availability)
             })
@@ -963,21 +1008,24 @@ export function GymDetailPage() {
   const rentalPerSession = getRentalTotal(selectedRentals)
   const rentalTotal = rentalPerSession * sessionCount
   const estimatedTotal = courtChargeTotal + rentalTotal
+  const bookingHomeHref = ownerSlug ? `/book/${ownerSlug}` : "/booking"
+  const bookingHeaderLabel = ownerSlug ? gym?.name ?? "Owner booking" : "PickleBuddy"
+  const bookingHeaderSublabel = ownerSlug ? "Owner booking page" : "Client booking"
 
   return (
     <main className="min-h-svh bg-muted/30" style={venueBrandingStyle}>
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/booking" className="flex items-center gap-3">
+          <Link to={bookingHomeHref} className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CalendarCheck className="size-5" aria-hidden="true" />
             </span>
             <span>
               <span className="block text-base leading-tight font-bold">
-                PickleBuddy
+                {bookingHeaderLabel}
               </span>
               <span className="block text-xs text-muted-foreground">
-                Client booking
+                {bookingHeaderSublabel}
               </span>
             </span>
           </Link>
@@ -1002,11 +1050,11 @@ export function GymDetailPage() {
 
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <Link
-          to="/booking"
+          to={bookingHomeHref}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Back to search
+          {ownerSlug ? "Back to owner venues" : "Back to search"}
         </Link>
 
         {!gym && isLoadingVenue ? (
