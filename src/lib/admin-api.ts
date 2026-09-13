@@ -14,6 +14,8 @@ export type AdminApiOwnerSummary = {
   total_gyms: number
   total_courts: number
   gross_revenue: number
+  system_fee_per_transaction: number
+  system_fee_billable_count: number
   system_share: number
   owner_total_profit: number
 }
@@ -32,8 +34,29 @@ export type AdminApiOwnerTransaction = {
   created_at: string
 }
 
+export type AdminApiOwnerCourt = {
+  id: string
+  name: string
+  surface: string
+  capacity: string
+  price_per_hour: number
+  status: "available" | "maintenance"
+  booking_mode: "private" | "open_play"
+  open_play_capacity?: number | null
+}
+
+export type AdminApiOwnerVenue = {
+  id: string
+  name: string
+  address: string
+  phone?: string | null
+  status: "active" | "inactive"
+  courts: AdminApiOwnerCourt[]
+}
+
 export type AdminApiOwnerDetail = {
   owner: AdminApiOwnerSummary
+  venues: AdminApiOwnerVenue[]
   transactions: AdminApiOwnerTransaction[]
 }
 
@@ -149,6 +172,30 @@ export async function updateAdminOwnerPaymentStatus(input: {
     system_payment_status: "paid" | "unpaid"
     suspension_reason?: "system_payment_due" | "manual_review" | null
   }>(response, "Unable to update owner payment status.")
+}
+
+export async function updateAdminOwnerSystemFee(input: {
+  token: string
+  ownerId: string
+  feePerTransaction: number
+}) {
+  const response = await fetch(
+    `${API_BASE_URL}/admin/owners/${input.ownerId}/system-fee`,
+    {
+      method: "POST",
+      headers: buildHeaders(input.token),
+      body: JSON.stringify({
+        fee_per_transaction: input.feePerTransaction,
+      }),
+    }
+  )
+
+  return parseResponse<{
+    owner_public_id: string
+    fee_per_transaction: number
+    system_share: number
+    owner_total_profit: number
+  }>(response, "Unable to update owner system fee.")
 }
 
 export async function updateAdminOwnerStatus(input: {

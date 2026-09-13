@@ -4,7 +4,6 @@ import { CircleDollarSign, ReceiptText, RotateCcw, Search } from "lucide-react"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
 import { formatCurrency } from "@/lib/currency"
 import { TransactionDetailSheet } from "@/shared/components/transactions/transaction-detail-sheet"
@@ -21,6 +20,7 @@ const statusFilters: { value: TransactionStatus | "all"; label: string }[] = [
 ]
 
 type AdvanceBookingFilter = "all" | "week" | "month"
+type SystemFeeFilter = "all" | "billable" | "not_billable"
 
 const advanceBookingFilters: {
   value: AdvanceBookingFilter
@@ -29,6 +29,15 @@ const advanceBookingFilters: {
   { value: "all", label: "All booking dates" },
   { value: "week", label: "7+ days advance" },
   { value: "month", label: "30+ days advance" },
+]
+
+const systemFeeFilters: {
+  value: SystemFeeFilter
+  label: string
+}[] = [
+  { value: "all", label: "All fees" },
+  { value: "billable", label: "Billable fee" },
+  { value: "not_billable", label: "Not billable" },
 ]
 
 const pageSizeOptions = [5, 10, 20, 50]
@@ -76,10 +85,16 @@ function transactionMatchesQuery(transaction: Transaction, query: string) {
   )
 }
 
+function transactionHasSystemFee(transaction: Transaction) {
+  return transaction.paymentStatus === "paid" && transaction.status !== "cancelled"
+}
+
 export function TransactionsManager({
   transactions,
   searchPlaceholder = "Search by ID, customer, or gym",
   enableReporting = false,
+  systemFeePerTransaction = 10,
+  allowHorizontalTableScroll = true,
   onSetStatus,
   onRefund,
   highlightedTransactionId,
@@ -87,6 +102,8 @@ export function TransactionsManager({
   transactions: Transaction[]
   searchPlaceholder?: string
   enableReporting?: boolean
+  systemFeePerTransaction?: number
+  allowHorizontalTableScroll?: boolean
   onSetStatus: (id: string, status: TransactionStatus) => void | Promise<void>
   onRefund: (id: string) => void | Promise<void>
   highlightedTransactionId?: string | null
@@ -102,6 +119,8 @@ export function TransactionsManager({
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("all")
   const [advanceBookingFilter, setAdvanceBookingFilter] =
     useState<AdvanceBookingFilter>("all")
+  const [systemFeeFilter, setSystemFeeFilter] =
+    useState<SystemFeeFilter>("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [pageSize, setPageSize] = useState(10)
@@ -157,6 +176,11 @@ export function TransactionsManager({
               getAdvanceBookingDays(transaction.date) >= 7) ||
             (advanceBookingFilter === "month" &&
               getAdvanceBookingDays(transaction.date) >= 30)) &&
+          (systemFeeFilter === "all" ||
+            (systemFeeFilter === "billable" &&
+              transactionHasSystemFee(transaction)) ||
+            (systemFeeFilter === "not_billable" &&
+              !transactionHasSystemFee(transaction))) &&
           (dateFrom.length === 0 || transaction.date >= dateFrom) &&
           (dateTo.length === 0 || transaction.date <= dateTo) &&
           transactionMatchesQuery(transaction, searchQuery)
@@ -168,6 +192,7 @@ export function TransactionsManager({
       courtFilter,
       paymentMethodFilter,
       advanceBookingFilter,
+      systemFeeFilter,
       dateFrom,
       dateTo,
       searchQuery,
@@ -198,6 +223,7 @@ export function TransactionsManager({
     courtFilter,
     paymentMethodFilter,
     advanceBookingFilter,
+    systemFeeFilter,
     dateFrom,
     dateTo,
     pageSize,
@@ -216,13 +242,18 @@ export function TransactionsManager({
     const refunded = filteredTransactions
       .filter((transaction) => transaction.paymentStatus === "refunded")
       .reduce((sum, transaction) => sum + transaction.amount, 0)
+    const systemFeeBillableCount = filteredTransactions.filter(
+      transactionHasSystemFee
+    ).length
 
     return {
       totalReports: filteredTransactions.length,
       revenue,
       refunded,
+      systemFeeBillableCount,
+      systemFeeOwed: systemFeeBillableCount * systemFeePerTransaction,
     }
-  }, [filteredTransactions])
+  }, [filteredTransactions, systemFeePerTransaction])
 
   const selectedTransaction =
     transactions.find((transaction) => transaction.id === selectedTransactionId) ??
@@ -235,6 +266,7 @@ export function TransactionsManager({
     courtFilter !== "all" ||
     paymentMethodFilter !== "all" ||
     advanceBookingFilter !== "all" ||
+    systemFeeFilter !== "all" ||
     dateFrom.length > 0 ||
     dateTo.length > 0
 
@@ -245,6 +277,7 @@ export function TransactionsManager({
     setCourtFilter("all")
     setPaymentMethodFilter("all")
     setAdvanceBookingFilter("all")
+    setSystemFeeFilter("all")
     setDateFrom("")
     setDateTo("")
   }
@@ -298,9 +331,9 @@ export function TransactionsManager({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       {enableReporting ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3">
             <div className="grid gap-1">
               <span className="text-xs uppercase text-muted-foreground">
@@ -332,12 +365,27 @@ export function TransactionsManager({
             </div>
             <ReceiptText className="size-4 text-destructive" aria-hidden="true" />
           </div>
+          <div className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+            <div className="grid gap-1">
+              <span className="text-xs uppercase text-muted-foreground">
+                System fee owed
+              </span>
+              <span className="text-xl font-semibold text-amber-700">
+                {formatCurrency(report.systemFeeOwed)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {report.systemFeeBillableCount} x{" "}
+                {formatCurrency(systemFeePerTransaction)}
+              </span>
+            </div>
+            <ReceiptText className="size-4 text-amber-700" aria-hidden="true" />
+          </div>
         </div>
       ) : null}
 
       <div className="grid gap-3 rounded-lg border bg-card p-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-          <div className="relative min-w-0 md:col-span-2 xl:col-span-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1.3fr)_minmax(96px,0.65fr)_minmax(132px,0.85fr)_minmax(132px,0.85fr)_minmax(132px,0.85fr)_minmax(142px,0.9fr)_minmax(132px,0.85fr)_minmax(176px,1fr)_auto]">
+          <div className="relative min-w-0 md:col-span-2 xl:col-span-1">
             <Search
               className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
@@ -355,7 +403,7 @@ export function TransactionsManager({
             onChange={(event) =>
               setStatusFilter(event.target.value as TransactionStatus | "all")
             }
-            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-span-1"
+            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             aria-label="Filter by status"
           >
             {statusFilters.map((filter) => (
@@ -368,7 +416,7 @@ export function TransactionsManager({
           <select
             value={paymentMethodFilter}
             onChange={(event) => setPaymentMethodFilter(event.target.value)}
-            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-span-2"
+            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             aria-label="Filter by payment method"
           >
             <option value="all">All payments</option>
@@ -387,7 +435,7 @@ export function TransactionsManager({
               setGymFilter(event.target.value)
               setCourtFilter("all")
             }}
-            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-span-2"
+            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             aria-label="Filter by gym"
           >
             <option value="all">All gyms</option>
@@ -403,7 +451,7 @@ export function TransactionsManager({
           <select
             value={courtFilter}
             onChange={(event) => setCourtFilter(event.target.value)}
-            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-span-2"
+            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             aria-label="Filter by court"
           >
             <option value="all">All courts</option>
@@ -423,7 +471,7 @@ export function TransactionsManager({
                 event.target.value as AdvanceBookingFilter
               )
             }
-            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 xl:col-span-2"
+            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             aria-label="Filter by advance booking"
           >
             {advanceBookingFilters.map((filter) => (
@@ -433,7 +481,22 @@ export function TransactionsManager({
             ))}
           </select>
 
-          <div className="min-w-0 rounded-md border bg-background p-1 md:col-span-2 xl:col-span-2">
+          <select
+            value={systemFeeFilter}
+            onChange={(event) =>
+              setSystemFeeFilter(event.target.value as SystemFeeFilter)
+            }
+            className="h-9 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            aria-label="Filter by system fee"
+          >
+            {systemFeeFilters.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+
+          <div className="min-w-0 rounded-md border bg-background p-1 md:col-span-2 xl:col-span-1">
             <DateRangePicker
               id="transactions-date-range"
               from={dateFrom}
@@ -451,7 +514,7 @@ export function TransactionsManager({
             variant="outline"
             size="sm"
             className={cn(
-              "h-9 w-full md:w-auto xl:col-span-1",
+              "h-9 w-full md:w-auto",
               !hasActiveFilters && "opacity-60"
             )}
             onClick={resetFilters}
@@ -461,44 +524,13 @@ export function TransactionsManager({
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Label className="text-xs uppercase text-muted-foreground">
-              Quick status
-            </Label>
-            {statusFilters.map((filter) => (
-              <Button
-                key={filter.value}
-                type="button"
-                size="sm"
-                variant={statusFilter === filter.value ? "default" : "ghost"}
-                className={cn(
-                  "h-8 px-3",
-                  statusFilter === filter.value && "pointer-events-none"
-                )}
-                onClick={() => setStatusFilter(filter.value)}
-              >
-                {filter.label}
-              </Button>
-            ))}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Showing{" "}
-            <span className="font-medium text-foreground">
-              {filteredTransactions.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium text-foreground">
-              {transactions.length}
-            </span>
-          </div>
-        </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2">
           <TransactionTable
             transactions={paginatedTransactions}
             highlightedTransactionId={highlightedTransactionId}
+            allowHorizontalScroll={allowHorizontalTableScroll}
             onView={(transaction) => setSelectedTransactionId(transaction.id)}
           />
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2">

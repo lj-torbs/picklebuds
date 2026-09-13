@@ -61,10 +61,12 @@ export function TransactionTable({
   transactions,
   onView,
   highlightedTransactionId,
+  allowHorizontalScroll = true,
 }: {
   transactions: Transaction[]
   onView: (transaction: Transaction) => void
   highlightedTransactionId?: string | null
+  allowHorizontalScroll?: boolean
 }) {
   if (transactions.length === 0) {
     return (
@@ -75,18 +77,28 @@ export function TransactionTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full min-w-max text-left text-sm">
+    <div
+      className={cn(
+        "max-w-full min-w-0 rounded-lg border bg-card",
+        allowHorizontalScroll ? "overflow-x-auto" : "overflow-hidden"
+      )}
+    >
+      <table
+        className={cn(
+          "w-full text-left text-sm",
+          allowHorizontalScroll ? "min-w-max" : "table-fixed"
+        )}
+      >
         <thead>
           <tr className="border-b bg-muted/30 text-[11px] uppercase text-muted-foreground">
-            <th className="px-4 py-3 font-medium">Transaction</th>
-            <th className="px-4 py-3 font-medium">Customer</th>
-            <th className="px-4 py-3 font-medium">Gym / court</th>
-            <th className="px-4 py-3 font-medium">Date</th>
-            <th className="px-4 py-3 font-medium">Amount</th>
-            <th className="px-4 py-3 font-medium">Payment</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[13%] px-3")}>Transaction</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[17%] px-3")}>Customer</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[18%] px-3")}>Gym / court</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[17%] px-3")}>Date</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[10%] px-3")}>Amount</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[12%] px-3")}>Payment</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[9%] px-3")}>Status</th>
+            <th className={cn("px-4 py-3 font-medium", !allowHorizontalScroll && "w-[4%] px-2")}>
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -110,29 +122,34 @@ export function TransactionTable({
                   "bg-destructive/15 ring-2 ring-inset ring-destructive/50"
               )}
             >
-              <td className="px-4 py-2.5">
+              <td className={cn("px-4 py-2.5", !allowHorizontalScroll && "px-3 align-top")}>
                 <div className="grid gap-1">
-                  <span className="font-medium">{transaction.id}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="break-words font-medium">{transaction.id}</span>
+                  <span className="break-words text-xs text-muted-foreground">
                     {transaction.paymentReceipt?.referenceNumber ?? "No reference"}
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-2.5">
-                <div className="font-medium">{transaction.customerName}</div>
-                <div className="text-xs text-muted-foreground">
+              <td className={cn("px-4 py-2.5", !allowHorizontalScroll && "px-3 align-top")}>
+                <div className="break-words font-medium">{transaction.customerName}</div>
+                <div className="break-words text-xs text-muted-foreground">
                   {transaction.customerEmail}
                 </div>
               </td>
-              <td className="px-4 py-2.5">
-                <div className="font-medium">{transaction.gym}</div>
-                <div className="text-xs text-muted-foreground">
+              <td className={cn("px-4 py-2.5", !allowHorizontalScroll && "px-3 align-top")}>
+                <div className="break-words font-medium">{transaction.gym}</div>
+                <div className="break-words text-xs text-muted-foreground">
                   {transaction.court}
                 </div>
               </td>
-              <td className="px-4 py-2.5 whitespace-nowrap">
+              <td
+                className={cn(
+                  "px-4 py-2.5 whitespace-nowrap",
+                  !allowHorizontalScroll && "px-3 align-top whitespace-normal"
+                )}
+              >
                 <div className="grid gap-1">
-                  <div className="flex items-center gap-2">
+                  <div className={cn("flex items-center gap-2", !allowHorizontalScroll && "flex-wrap")}>
                     <span>{transaction.date}</span>
                     {advanceBookingLabel ? (
                       <span
@@ -152,19 +169,19 @@ export function TransactionTable({
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-2.5 font-medium">{formatCurrency(transaction.amount)}</td>
-              <td className="px-4 py-2.5">
+              <td className={cn("px-4 py-2.5 font-medium", !allowHorizontalScroll && "px-3 align-top")}>{formatCurrency(transaction.amount)}</td>
+              <td className={cn("px-4 py-2.5", !allowHorizontalScroll && "px-3 align-top")}>
                 <div className="grid gap-1">
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="break-words text-xs font-medium text-muted-foreground">
                     {transaction.paymentMethod}
                   </span>
                   <PaymentStatusBadge status={transaction.paymentStatus} />
                 </div>
               </td>
-              <td className="px-4 py-2.5">
+              <td className={cn("px-4 py-2.5", !allowHorizontalScroll && "px-3 align-top")}>
                 <TransactionStatusBadge status={transaction.status} />
               </td>
-              <td className="px-4 py-2.5 text-right">
+              <td className={cn("px-4 py-2.5 text-right", !allowHorizontalScroll && "px-2 align-top")}>
                 <Button
                   type="button"
                   variant="ghost"

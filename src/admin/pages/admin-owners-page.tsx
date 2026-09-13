@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Search } from "lucide-react"
 
-import { OwnerDetailSheet } from "@/admin/components/owners/owner-detail-sheet"
 import { OwnerStatusBadge } from "@/admin/components/owners/owner-status-badge"
 import type {
-  OwnerDetailRecord,
   OwnerRecord,
   SystemPaymentStatus,
 } from "@/admin/lib/admin-owners-context"
@@ -57,25 +56,25 @@ export function AdminOwnersPage() {
     isLoading,
     error,
     refreshOwners,
-    getOwnerDetail,
-    setOwnerStatus,
     setSystemPaymentStatus,
+    setOwnerSystemFee,
     lockOwnerUntilPaid,
-    unlockOwner,
   } = useAdminOwners()
   const { admin } = useAdminAuth()
+  const navigate = useNavigate()
   const toast = useToast()
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null)
-  const [selectedOwnerDetail, setSelectedOwnerDetail] =
-    useState<OwnerDetailRecord | null>(null)
   const [systemPaymentFilter, setSystemPaymentFilter] = useState<
     SystemPaymentStatus | "all"
   >("all")
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [feeDrafts, setFeeDrafts] = useState<Record<string, string>>({})
+  const [submittingFeeOwnerId, setSubmittingFeeOwnerId] = useState<string | null>(
+    null
+  )
 
   useEffect(() => {
     if (!admin?.token) {
@@ -83,38 +82,6 @@ export function AdminOwnersPage() {
     }
     void refreshOwners({ dateFrom, dateTo })
   }, [admin?.token, dateFrom, dateTo, refreshOwners])
-
-  useEffect(() => {
-    if (!selectedOwnerId || !admin?.token) {
-      return
-    }
-
-    let isActive = true
-    void getOwnerDetail(selectedOwnerId, { dateFrom, dateTo })
-      .then((detail) => {
-        if (isActive) {
-          setSelectedOwnerDetail(detail)
-        }
-      })
-      .catch((nextError) => {
-        if (!isActive) {
-          return
-        }
-        setSelectedOwnerDetail(null)
-        toast.add({
-          title: "Unable to load owner details",
-          description:
-            nextError instanceof Error
-              ? nextError.message
-              : "Please try again.",
-          type: "error",
-        })
-      })
-
-    return () => {
-      isActive = false
-    }
-  }, [admin?.token, dateFrom, dateTo, getOwnerDetail, selectedOwnerId, toast])
 
   const filteredOwners = useMemo(
     () =>
@@ -132,38 +99,8 @@ export function AdminOwnersPage() {
     [owners, searchQuery, systemPaymentFilter, quickFilter]
   )
 
-  const selectedOwner = owners.find((owner) => owner.id === selectedOwnerId) ?? null
-
-  async function handleToggleStatus(id: string) {
-    const owner = owners.find((current) => current.id === id)
-    if (!owner) {
-      return
-    }
-
-    const nextStatus = owner.status === "active" ? "suspended" : "active"
-    try {
-      await setOwnerStatus(
-        id,
-        nextStatus,
-        nextStatus === "suspended" ? "manual_review" : undefined
-      )
-      toast.add({
-        title: nextStatus === "suspended" ? "Owner suspended" : "Owner reactivated",
-        description: `${owner.name} is now ${nextStatus}.`,
-        type: "success",
-      })
-      if (selectedOwnerId === id) {
-        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
-        setSelectedOwnerDetail(detail)
-      }
-    } catch (error) {
-      toast.add({
-        title: "Unable to update owner",
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-        type: "error",
-      })
-    }
+  function getFeeDraft(owner: OwnerRecord) {
+    return feeDrafts[owner.id] ?? String(owner.systemFeePerTransaction)
   }
 
   async function handleSystemPaymentStatus(
@@ -184,10 +121,6 @@ export function AdminOwnersPage() {
         type: "success",
       })
       await refreshOwners({ dateFrom, dateTo })
-      if (selectedOwnerId === id) {
-        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
-        setSelectedOwnerDetail(detail)
-      }
     } catch (error) {
       toast.add({
         title: "Unable to update settlement",
@@ -195,6 +128,48 @@ export function AdminOwnersPage() {
           error instanceof Error ? error.message : "Please try again.",
         type: "error",
       })
+    }
+  }
+
+  async function handleSystemFeeSave(id: string) {
+    const owner = owners.find((current) => current.id === id)
+    if (!owner) {
+      return
+    }
+
+    const nextFee = Number(getFeeDraft(owner))
+    if (!Number.isFinite(nextFee) || nextFee < 0) {
+      toast.add({
+        title: "Invalid system fee",
+        description: "Enter a valid fee amount of 0 or higher.",
+        type: "error",
+      })
+      return
+    }
+
+    setSubmittingFeeOwnerId(id)
+    try {
+      await setOwnerSystemFee(id, nextFee)
+      toast.add({
+        title: "System fee updated",
+        description: `${owner.name} is now charged ${formatCurrency(nextFee)} per billable transaction.`,
+        type: "success",
+      })
+      setFeeDrafts((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+      await refreshOwners({ dateFrom, dateTo })
+    } catch (error) {
+      toast.add({
+        title: "Unable to update system fee",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    } finally {
+      setSubmittingFeeOwnerId(null)
     }
   }
 
@@ -211,40 +186,9 @@ export function AdminOwnersPage() {
         description: `${owner.name} must pay the system share first before access is restored.`,
         type: "success",
       })
-      if (selectedOwnerId === id) {
-        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
-        setSelectedOwnerDetail(detail)
-      }
     } catch (error) {
       toast.add({
         title: "Unable to lock owner",
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-        type: "error",
-      })
-    }
-  }
-
-  async function handleUnlock(id: string) {
-    const owner = owners.find((current) => current.id === id)
-    if (!owner) {
-      return
-    }
-
-    try {
-      await unlockOwner(id)
-      toast.add({
-        title: "Owner access restored",
-        description: `${owner.name} can access the owner panel again.`,
-        type: "success",
-      })
-      if (selectedOwnerId === id) {
-        const detail = await getOwnerDetail(id, { dateFrom, dateTo })
-        setSelectedOwnerDetail(detail)
-      }
-    } catch (error) {
-      toast.add({
-        title: "Unable to unlock owner",
         description:
           error instanceof Error ? error.message : "Please try again.",
         type: "error",
@@ -351,6 +295,7 @@ export function AdminOwnersPage() {
                 <th className="px-4 py-3 font-medium">Gyms</th>
                 <th className="px-4 py-3 font-medium">Courts</th>
                 <th className="px-4 py-3 font-medium">Owner total profit</th>
+                <th className="px-4 py-3 font-medium">Fee / transaction</th>
                 <th className="px-4 py-3 font-medium">System share</th>
                 <th className="px-4 py-3 font-medium">Payment status</th>
                 <th className="px-4 py-3 font-medium">Access</th>
@@ -376,6 +321,41 @@ export function AdminOwnersPage() {
                     <td className="px-4 py-3">{owner.totalCourts}</td>
                     <td className="px-4 py-3 font-medium">
                       {formatCurrency(owner.ownerProfit)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex min-w-44 items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={getFeeDraft(owner)}
+                          onChange={(event) =>
+                            setFeeDrafts((current) => ({
+                              ...current,
+                              [owner.id]: event.target.value,
+                            }))
+                          }
+                          className="h-8 w-24"
+                          aria-label={`System fee per transaction for ${owner.name}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            submittingFeeOwnerId === owner.id ||
+                            Number(getFeeDraft(owner)) ===
+                              owner.systemFeePerTransaction
+                          }
+                          onClick={() => void handleSystemFeeSave(owner.id)}
+                        >
+                          {submittingFeeOwnerId === owner.id ? "Saving" : "Save"}
+                        </Button>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {owner.systemFeeBillableCount} billable transaction
+                        {owner.systemFeeBillableCount === 1 ? "" : "s"}
+                      </p>
                     </td>
                     <td className="px-4 py-3 font-medium">
                       {formatCurrency(owner.systemShare)}
@@ -429,7 +409,7 @@ export function AdminOwnersPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setSelectedOwnerId(owner.id)}
+                          onClick={() => navigate(`/admin/owners/${owner.id}`)}
                         >
                           View
                         </Button>
@@ -442,41 +422,6 @@ export function AdminOwnersPage() {
           </table>
         </div>
       )}
-
-      <OwnerDetailSheet
-        owner={selectedOwnerDetail?.owner ?? selectedOwner}
-        transactions={selectedOwnerDetail?.transactions ?? []}
-        open={selectedOwner !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedOwnerId(null)
-            setSelectedOwnerDetail(null)
-          }
-        }}
-        onToggleStatus={handleToggleStatus}
-        onSetSystemPaymentStatus={handleSystemPaymentStatus}
-        onLockUntilPaid={handleLockUntilPaid}
-        onUnlock={handleUnlock}
-        settlementSummary={
-          selectedOwnerDetail
-            ? {
-                totalGyms: selectedOwnerDetail.owner.totalGyms,
-                totalCourts: selectedOwnerDetail.owner.totalCourts,
-                grossRevenue: selectedOwnerDetail.owner.grossRevenue,
-                systemShare: selectedOwnerDetail.owner.systemShare,
-                ownerProfit: selectedOwnerDetail.owner.ownerProfit,
-              }
-            : selectedOwner
-              ? {
-                  totalGyms: selectedOwner.totalGyms,
-                  totalCourts: selectedOwner.totalCourts,
-                  grossRevenue: selectedOwner.grossRevenue,
-                  systemShare: selectedOwner.systemShare,
-                  ownerProfit: selectedOwner.ownerProfit,
-                }
-              : null
-        }
-      />
     </div>
   )
 }

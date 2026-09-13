@@ -8,8 +8,10 @@ import {
   lockAdminOwner,
   unlockAdminOwner,
   updateAdminOwnerPaymentStatus,
+  updateAdminOwnerSystemFee,
   updateAdminOwnerStatus,
   type AdminApiOwnerDetail,
+  type AdminApiOwnerVenue,
   type AdminApiOwnerSummary,
   type AdminApiOwnerTransaction,
 } from "@/lib/admin-api"
@@ -30,6 +32,8 @@ export type OwnerRecord = {
   totalGyms: number
   totalCourts: number
   grossRevenue: number
+  systemFeePerTransaction: number
+  systemFeeBillableCount: number
   systemShare: number
   ownerProfit: number
 }
@@ -48,8 +52,29 @@ export type OwnerTransactionRecord = {
   createdAt: string
 }
 
+export type OwnerCourtRecord = {
+  id: string
+  name: string
+  surface: string
+  capacity: string
+  pricePerHour: number
+  status: "available" | "maintenance"
+  bookingMode: "private" | "open_play"
+  openPlayCapacity?: number
+}
+
+export type OwnerVenueRecord = {
+  id: string
+  name: string
+  address: string
+  phone?: string
+  status: "active" | "inactive"
+  courts: OwnerCourtRecord[]
+}
+
 export type OwnerDetailRecord = {
   owner: OwnerRecord
+  venues: OwnerVenueRecord[]
   transactions: OwnerTransactionRecord[]
 }
 
@@ -68,6 +93,7 @@ type AdminOwnersContextValue = {
     reason?: OwnerSuspensionReason
   ) => Promise<void>
   setSystemPaymentStatus: (id: string, status: SystemPaymentStatus) => Promise<void>
+  setOwnerSystemFee: (id: string, feePerTransaction: number) => Promise<void>
   lockOwnerUntilPaid: (id: string) => Promise<void>
   unlockOwner: (id: string) => Promise<void>
 }
@@ -89,6 +115,8 @@ function mapOwner(owner: AdminApiOwnerSummary): OwnerRecord {
     totalGyms: owner.total_gyms,
     totalCourts: owner.total_courts,
     grossRevenue: owner.gross_revenue,
+    systemFeePerTransaction: owner.system_fee_per_transaction,
+    systemFeeBillableCount: owner.system_fee_billable_count,
     systemShare: owner.system_share,
     ownerProfit: owner.owner_total_profit,
   }
@@ -112,9 +140,30 @@ function mapTransaction(
   }
 }
 
+function mapVenue(venue: AdminApiOwnerVenue): OwnerVenueRecord {
+  return {
+    id: venue.id,
+    name: venue.name,
+    address: venue.address,
+    phone: venue.phone ?? undefined,
+    status: venue.status,
+    courts: venue.courts.map((court) => ({
+      id: court.id,
+      name: court.name,
+      surface: court.surface,
+      capacity: court.capacity,
+      pricePerHour: court.price_per_hour,
+      status: court.status,
+      bookingMode: court.booking_mode,
+      openPlayCapacity: court.open_play_capacity ?? undefined,
+    })),
+  }
+}
+
 function mapOwnerDetail(detail: AdminApiOwnerDetail): OwnerDetailRecord {
   return {
     owner: mapOwner(detail.owner),
+    venues: detail.venues.map(mapVenue),
     transactions: detail.transactions.map(mapTransaction),
   }
 }
@@ -174,9 +223,7 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
   const patchOwner = React.useCallback(
     (
       id: string,
-      nextOwner: Partial<
-        Pick<OwnerRecord, "status" | "systemPaymentStatus" | "suspensionReason">
-      >
+      nextOwner: Partial<OwnerRecord>
     ) => {
       setOwners((current) =>
         current.map((owner) => (owner.id === id ? { ...owner, ...nextOwner } : owner))
@@ -228,6 +275,27 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
     [admin, patchOwner]
   )
 
+  const setOwnerSystemFee = React.useCallback(
+    async (id: string, feePerTransaction: number) => {
+      if (!admin?.token) {
+        throw new Error("Admin session is required.")
+      }
+
+      const response = await updateAdminOwnerSystemFee({
+        token: admin.token,
+        ownerId: id,
+        feePerTransaction,
+      })
+
+      patchOwner(id, {
+        systemFeePerTransaction: response.fee_per_transaction,
+        systemShare: response.system_share,
+        ownerProfit: response.owner_total_profit,
+      })
+    },
+    [admin, patchOwner]
+  )
+
   const lockOwnerUntilPaid = React.useCallback(
     async (id: string) => {
       if (!admin?.token) {
@@ -269,6 +337,7 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
       getOwnerDetail,
       setOwnerStatus,
       setSystemPaymentStatus,
+      setOwnerSystemFee,
       lockOwnerUntilPaid,
       unlockOwner,
     }),
@@ -280,6 +349,7 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
       getOwnerDetail,
       setOwnerStatus,
       setSystemPaymentStatus,
+      setOwnerSystemFee,
       lockOwnerUntilPaid,
       unlockOwner,
     ]

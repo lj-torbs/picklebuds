@@ -50,11 +50,16 @@ export function OwnerSidebar({
       )}
     >
       <div className="grid gap-4">
-        <div className="grid gap-3">
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            collapsed ? "justify-center" : "justify-between"
+          )}
+        >
           <div
             className={cn(
               "flex items-center",
-              collapsed ? "justify-center" : "gap-3"
+              collapsed ? "hidden" : "gap-3"
             )}
           >
             <span
@@ -82,30 +87,26 @@ export function OwnerSidebar({
               </span>
             </span>
           </div>
+
+          {onCollapsedChange ? (
+            <button
+              type="button"
+              onClick={() => onCollapsedChange(!collapsed)}
+              className="flex size-9 shrink-0 items-center justify-center rounded-md border border-sidebar-border bg-sidebar-accent/70 text-sidebar-foreground/80 transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="size-4" aria-hidden="true" />
+              ) : (
+                <PanelLeftClose className="size-4" aria-hidden="true" />
+              )}
+            </button>
+          ) : null}
         </div>
 
         <div className="h-px bg-sidebar-border" />
       </div>
-
-      {onCollapsedChange ? (
-        <button
-          type="button"
-          onClick={() => onCollapsedChange(!collapsed)}
-          className={cn(
-            "flex items-center rounded-md text-sm font-medium text-sidebar-foreground/72 transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            collapsed ? "size-10 justify-center" : "gap-2 px-3 py-2"
-          )}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="size-4" aria-hidden="true" />
-          ) : (
-            <PanelLeftClose className="size-4" aria-hidden="true" />
-          )}
-          {!collapsed ? <span>Collapse</span> : null}
-        </button>
-      ) : null}
 
       <nav className={cn("grid gap-1.5", collapsed && "justify-items-center")}>
         <span

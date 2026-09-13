@@ -18,7 +18,7 @@ export function AdminTransactionsPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <div>
         <p className="text-sm font-medium text-primary">Transactions</p>
         <h2 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -32,6 +32,7 @@ export function AdminTransactionsPage() {
 
       <TransactionsManager
         transactions={transactions}
+        allowHorizontalTableScroll={false}
         onSetStatus={handleSetStatus}
         onRefund={handleRefund}
       />

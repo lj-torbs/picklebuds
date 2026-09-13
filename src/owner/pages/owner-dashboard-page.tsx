@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react"
 import {
   CalendarClock,
   CheckCircle2,
-  Clock3,
   DollarSign,
   ListChecks,
+  ReceiptText,
   XCircle,
 } from "lucide-react"
 
@@ -24,6 +24,9 @@ type DashboardState = {
   pending: number
   completed: number
   cancelled: number
+  systemFeePerTransaction: number
+  systemFeeBillableCount: number
+  systemFeeOwed: number
   recentTransactions: OwnerTransactionApiItem[]
 }
 
@@ -49,6 +52,9 @@ export function OwnerDashboardPage() {
     pending: 0,
     completed: 0,
     cancelled: 0,
+    systemFeePerTransaction: 10,
+    systemFeeBillableCount: 0,
+    systemFeeOwed: 0,
     recentTransactions: [],
   })
   const [now, setNow] = useState(() => new Date())
@@ -80,6 +86,9 @@ export function OwnerDashboardPage() {
           pending: response.stats.pending_count,
           completed: response.stats.completed_count,
           cancelled: response.stats.cancelled_count,
+          systemFeePerTransaction: response.stats.system_fee_per_transaction,
+          systemFeeBillableCount: response.stats.system_fee_billable_count,
+          systemFeeOwed: response.stats.system_fee_owed,
           recentTransactions: response.recent_transactions,
         })
         setError(null)
@@ -114,10 +123,12 @@ export function OwnerDashboardPage() {
         valueTone: "text-primary",
       },
       {
-        label: "For review",
-        value: String(dashboard.pending),
-        helper: "Pending proofs",
-        icon: Clock3,
+        label: "System fee owed",
+        value: formatCurrency(dashboard.systemFeeOwed),
+        helper: `${dashboard.systemFeeBillableCount} x ${formatCurrency(
+          dashboard.systemFeePerTransaction
+        )}`,
+        icon: ReceiptText,
         shell:
           "border-amber-500/20 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.16),transparent_42%),linear-gradient(135deg,rgba(245,158,11,0.07),hsl(var(--card))_64%)]",
         iconTone: "bg-amber-500/10 text-amber-700",
@@ -149,6 +160,9 @@ export function OwnerDashboardPage() {
       dashboard.completed,
       dashboard.pending,
       dashboard.revenue,
+      dashboard.systemFeeBillableCount,
+      dashboard.systemFeeOwed,
+      dashboard.systemFeePerTransaction,
     ]
   )
 

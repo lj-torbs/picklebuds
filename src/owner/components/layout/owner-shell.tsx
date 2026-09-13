@@ -53,13 +53,13 @@ export function OwnerShell() {
     <div
       style={shellStyle}
       className={cn(
-        "min-h-svh bg-background",
+        "min-h-svh overflow-x-hidden bg-background",
         usesSidebar &&
           !sidebarCollapsed &&
-          "lg:grid lg:grid-cols-[17rem_1fr]",
+          "lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]",
         usesSidebar &&
           sidebarCollapsed &&
-          "lg:grid lg:grid-cols-[4.5rem_1fr]"
+          "lg:grid lg:grid-cols-[4.5rem_minmax(0,1fr)]"
       )}
     >
       {usesSidebar ? (
@@ -72,7 +72,7 @@ export function OwnerShell() {
         </aside>
       ) : null}
 
-      <div className="flex min-h-svh min-w-0 flex-col">
+      <div className="flex min-h-svh min-w-0 flex-col overflow-x-hidden">
         <header className="relative flex min-h-16 items-center gap-3 border-b bg-card px-4 py-3 shadow-sm before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-primary sm:px-6">
           <Sheet>
             <SheetTrigger
@@ -162,8 +162,8 @@ export function OwnerShell() {
         <main
           className={
             branding.density === "compact"
-              ? "flex-1 px-4 py-5 sm:px-5"
-              : "flex-1 px-4 py-6 sm:px-6"
+              ? "min-w-0 flex-1 px-4 py-5 sm:px-5"
+              : "min-w-0 flex-1 px-4 py-6 sm:px-6"
           }
         >
           <Outlet />

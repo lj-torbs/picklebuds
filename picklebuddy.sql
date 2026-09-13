@@ -489,7 +489,7 @@ VALUES
 
 INSERT INTO `admins` (`id`, `public_id`, `full_name`, `email`, `password_hash`, `status`, `created_at`)
 VALUES
-  (1, 'ADM-1001', 'Platform Admin', 'admin@picklebuddy.local', NULL, 'active', '2026-01-01 08:00:00');
+  (1, 'ADM-1001', 'Platform Admin', 'admin@example.com', 'pbkdf2_sha256$600000$v52lQ462yqPTXzGykm3BhA==$vDYJN1TOv3OSa/YG94/7sbKN7vB3VtAU2JQDFL4Lh3I=', 'active', '2026-01-01 08:00:00');
 
 INSERT INTO `venues` (`id`, `public_id`, `owner_id`, `name`, `address`, `phone`, `status`, `image_url`, `created_at`)
 VALUES

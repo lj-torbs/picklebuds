@@ -72,6 +72,7 @@ export function OwnerTransactionsPage() {
   const [remoteTransactions, setRemoteTransactions] = useState<Transaction[]>(
     []
   )
+  const [systemFeePerTransaction, setSystemFeePerTransaction] = useState(10)
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<
     string | null
   >(null)
@@ -84,11 +85,12 @@ export function OwnerTransactionsPage() {
     let isActive = true
 
     void getOwnerTransactionsWithApi(owner.token)
-      .then((items) => {
+      .then((response) => {
         if (!isActive) {
           return
         }
-        setRemoteTransactions(items.map(mapApiTransactionToTransaction))
+        setSystemFeePerTransaction(response.system_fee_per_transaction)
+        setRemoteTransactions(response.items.map(mapApiTransactionToTransaction))
       })
       .catch(() => {
         if (!isActive) {
@@ -203,6 +205,7 @@ export function OwnerTransactionsPage() {
       <TransactionsManager
         transactions={visibleTransactions}
         enableReporting
+        systemFeePerTransaction={systemFeePerTransaction}
         highlightedTransactionId={highlightedTransactionId}
         onSetStatus={handleSetStatus}
         onRefund={handleRefund}

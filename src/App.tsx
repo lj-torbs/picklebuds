@@ -3,8 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { RequireAdminAuth } from "@/admin/components/require-admin-auth"
 import { AdminShell } from "@/admin/components/layout/admin-shell"
 import { AdminDashboardPage } from "@/admin/pages/admin-dashboard-page"
-import { AdminGymsPage } from "@/admin/pages/admin-gyms-page"
 import { AdminLoginPage } from "@/admin/pages/admin-login-page"
+import { AdminOwnerDetailPage } from "@/admin/pages/admin-owner-detail-page"
 import { AdminOwnersPage } from "@/admin/pages/admin-owners-page"
 import { AdminTransactionsPage } from "@/admin/pages/admin-transactions-page"
 import { RequireAuth } from "@/components/auth/require-auth"
@@ -52,8 +52,9 @@ export function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="transactions" element={<AdminTransactionsPage />} />
-          <Route path="gyms" element={<AdminGymsPage />} />
+          <Route path="gyms" element={<Navigate to="/admin/owners" replace />} />
           <Route path="owners" element={<AdminOwnersPage />} />
+          <Route path="owners/:ownerId" element={<AdminOwnerDetailPage />} />
           <Route
             path="users"
             element={<Navigate to="/admin/owners" replace />}

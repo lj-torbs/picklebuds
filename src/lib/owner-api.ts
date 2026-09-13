@@ -13,6 +13,9 @@ export type OwnerDashboardApiStats = {
   pending_count: number
   completed_count: number
   cancelled_count: number
+  system_fee_per_transaction: number
+  system_fee_billable_count: number
+  system_fee_owed: number
   venue_count: number
   court_count: number
 }
@@ -172,12 +175,13 @@ export async function getOwnerTransactionsWithApi(token: string) {
     headers: { Authorization: `Bearer ${token}` },
   })
 
-  const payload = await parseApiResponse<{ items: OwnerTransactionApiItem[] }>(
+  return parseApiResponse<{
+    system_fee_per_transaction: number
+    items: OwnerTransactionApiItem[]
+  }>(
     response,
     "Unable to load owner transactions right now."
   )
-
-  return payload.items
 }
 
 export async function getOwnerBrandingWithApi(token: string) {
