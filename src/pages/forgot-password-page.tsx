@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { CalendarCheck, Mail } from "lucide-react"
+import { Mail } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { loginSchema, sanitizeEmail } from "@/lib/validation"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -41,9 +42,7 @@ export function ForgotPasswordPage() {
       <Card className="w-full max-w-md rounded-lg">
         <CardHeader className="text-center">
           <Link to="/" className="mx-auto flex w-fit items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <CalendarCheck className="size-4" aria-hidden="true" />
-            </span>
+            <PickleBuddyLogo className="size-9 shadow-sm" />
             <span className="font-bold">PickleBuddy</span>
           </Link>
           <CardTitle className="mt-2 text-xl">Reset your password</CardTitle>

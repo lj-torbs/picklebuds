@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { CalendarCheck, UserRound } from "lucide-react"
+import { UserRound } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { buttonVariants } from "@/components/ui/button-variants"
@@ -9,6 +9,7 @@ import {
   markNotificationReadWithApi,
   type NotificationApiItem,
 } from "@/lib/notifications-api"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 import { NotificationsList } from "@/shared/components/notifications/notifications-list"
 
 export function NotificationsPage() {
@@ -96,9 +97,7 @@ export function NotificationsPage() {
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/booking" className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <CalendarCheck className="size-5" aria-hidden="true" />
-            </span>
+            <PickleBuddyLogo className="size-10 shadow-sm" />
             <span>
               <span className="block text-base leading-tight font-bold">
                 PickleBuddy

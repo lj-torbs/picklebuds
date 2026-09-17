@@ -1,11 +1,23 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowRight, Clock3, MapPin, Search, UsersRound } from "lucide-react"
+import {
+  ArrowRight,
+  Clock3,
+  Loader2,
+  MapPin,
+  Megaphone,
+  Search,
+  UsersRound,
+} from "lucide-react"
 
 import { buttonVariants } from "@/components/ui/button-variants"
 import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/toast"
+import { getAuthErrorMessage } from "@/lib/auth-api"
+import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
 import { formatCurrency } from "@/lib/currency"
+import { announceOpenPlayWithApi } from "@/lib/notifications-api"
 import { cn } from "@/lib/utils"
 import { GymPhoto } from "@/shared/components/gyms/gym-photo"
 import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
@@ -16,9 +28,12 @@ type OpenPlayListing = {
   gym: Gym
   court: Court
   nextSession: string | null
+  nextDate: string | null
+  nextSlot: string | null
   nextSeatsTaken: number
   nextSeatsLeft: number
   totalUpcomingSeats: number
+  canAnnounce: boolean
 }
 
 const DAYS_IN_VIEW = 7
@@ -61,8 +76,11 @@ function formatSession(date: string, slot: string) {
 
 export function OpenPlayPanel() {
   const { gyms } = useGyms()
-  const { getOpenPlaySeatsTaken } = useBookings()
+  const { user } = useAuth()
+  const { bookings, getOpenPlaySeatsTaken } = useBookings()
+  const toast = useToast()
   const [searchQuery, setSearchQuery] = useState("")
+  const [announcingCourtId, setAnnouncingCourtId] = useState<string | null>(null)
 
   const futureDays = useMemo(() => buildFutureDays(), [])
 
@@ -79,6 +97,8 @@ export function OpenPlayPanel() {
           )
           .map((court) => {
             let nextSession: string | null = null
+            let nextDate: string | null = null
+            let nextSlot: string | null = null
             let nextSeatsTaken = 0
             let nextSeatsLeft = 0
             let totalUpcomingSeats = 0
@@ -100,24 +120,43 @@ export function OpenPlayPanel() {
 
                 if (!nextSession && seatsLeft > 0) {
                   nextSession = formatSession(day, slot)
+                  nextDate = day
+                  nextSlot = slot
                   nextSeatsTaken = seatsTaken
                   nextSeatsLeft = seatsLeft
                 }
               })
             })
 
+            const playerHasJoined =
+              nextDate !== null &&
+              nextSlot !== null &&
+              bookings.some(
+                (booking) =>
+                  booking.gymId === gym.id &&
+                  booking.courtId === court.id &&
+                  booking.bookingType === "open_play" &&
+                  booking.date === nextDate &&
+                  booking.slots.includes(nextSlot ?? "") &&
+                  (booking.status === "pending" ||
+                    booking.status === "confirmed")
+              )
+
             return {
               gym,
               court,
               nextSession,
+              nextDate,
+              nextSlot,
               nextSeatsTaken,
               nextSeatsLeft,
               totalUpcomingSeats,
+              canAnnounce: playerHasJoined,
             }
           })
       )
       .filter((listing) => listing.nextSession !== null)
-  }, [futureDays, getOpenPlaySeatsTaken, gyms])
+  }, [bookings, futureDays, getOpenPlaySeatsTaken, gyms])
 
   const filteredListings = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
@@ -134,6 +173,59 @@ export function OpenPlayPanel() {
         court.surface.toLowerCase().includes(normalizedQuery)
     )
   }, [listings, searchQuery])
+
+  async function handleAnnounce(listing: OpenPlayListing) {
+    if (!user?.token) {
+      toast.add({
+        title: "Sign in required",
+        description: "Log in as a player before announcing an Open Play session.",
+        type: "error",
+      })
+      return
+    }
+
+    if (!listing.nextDate || !listing.nextSlot) {
+      toast.add({
+        title: "No Open Play session selected",
+        description: "Choose an Open Play date and time before announcing.",
+        type: "error",
+      })
+      return
+    }
+
+    const announcementKey = `${listing.court.id}:${listing.nextDate}:${listing.nextSlot}`
+    setAnnouncingCourtId(announcementKey)
+    try {
+      const result = await announceOpenPlayWithApi(user.token, {
+        venuePublicId: listing.gym.id,
+        courtPublicId: listing.court.id,
+        bookingDate: listing.nextDate,
+        slotLabel: listing.nextSlot,
+      })
+
+      toast.add({
+        title:
+          result.notified_count > 0
+            ? "Open Play announced"
+            : "No opted-in players yet",
+        description:
+          result.notified_count > 0
+            ? `${result.notified_count} player${
+                result.notified_count === 1 ? "" : "s"
+              } received your announcement.`
+            : "No players have allowed Open Play announcements yet.",
+        type: result.notified_count > 0 ? "success" : undefined,
+      })
+    } catch (error) {
+      toast.add({
+        title: "Unable to announce Open Play",
+        description: getAuthErrorMessage(error, "Please try again."),
+        type: "error",
+      })
+    } finally {
+      setAnnouncingCourtId(null)
+    }
+  }
 
   return (
     <div className="grid gap-5">
@@ -191,13 +283,15 @@ export function OpenPlayPanel() {
               gym,
               court,
               nextSession,
+              nextDate,
+              nextSlot,
               nextSeatsTaken,
               nextSeatsLeft,
               totalUpcomingSeats,
+              canAnnounce,
             }) => (
-              <Link
+              <div
                 key={court.id}
-                to={`/booking/${gym.id}?court=${court.id}`}
                 className="group grid gap-4 rounded-lg border bg-background p-4 shadow-xs transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md sm:grid-cols-[132px_minmax(0,1fr)]"
               >
                 <div className="relative overflow-hidden rounded-lg border">
@@ -242,17 +336,57 @@ export function OpenPlayPanel() {
                       seats this week
                     </span>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
-                    Join session
-                    <ArrowRight
-                      className={cn(
-                        "size-3.5 transition group-hover:translate-x-0.5"
-                      )}
-                      aria-hidden="true"
-                    />
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={`/booking/${gym.id}?court=${court.id}`}
+                      className={buttonVariants({ size: "sm" })}
+                    >
+                      Join session
+                      <ArrowRight
+                        className={cn(
+                          "size-3.5 transition group-hover/button:translate-x-0.5"
+                        )}
+                        aria-hidden="true"
+                      />
+                    </Link>
+                    {canAnnounce ? (
+                      <button
+                        type="button"
+                        className={cn(
+                          buttonVariants({ variant: "outline", size: "sm" }),
+                          "gap-1.5"
+                        )}
+                        disabled={
+                          announcingCourtId === `${court.id}:${nextDate}:${nextSlot}`
+                        }
+                        onClick={() => {
+                          void handleAnnounce({
+                            gym,
+                            court,
+                            nextSession,
+                            nextDate,
+                            nextSlot,
+                            nextSeatsTaken,
+                            nextSeatsLeft,
+                            totalUpcomingSeats,
+                            canAnnounce,
+                          })
+                        }}
+                      >
+                        {announcingCourtId === `${court.id}:${nextDate}:${nextSlot}` ? (
+                          <Loader2
+                            className="size-4 animate-spin"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Megaphone className="size-4" aria-hidden="true" />
+                        )}
+                        Announce to all
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </Link>
+              </div>
             )
           )}
         </div>

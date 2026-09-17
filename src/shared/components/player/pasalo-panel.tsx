@@ -188,7 +188,7 @@ export function PasaloPanel() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Claim a court slot from another player who can no longer use their
             reservation. Payment is handled directly between players through
-            GCash for this prototype.
+            the payment method agreed upon by both players.
           </p>
         </div>
 

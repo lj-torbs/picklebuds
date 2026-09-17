@@ -12,6 +12,8 @@ type AuthUser = {
   token?: string
   phone?: string
   location?: string
+  avatarUrl?: string
+  openPlayAnnouncementsEnabled?: boolean
   joinedAt: string
 }
 
@@ -26,7 +28,12 @@ type SignupInput = {
   password: string
 }
 
-type ProfileUpdate = Partial<Pick<AuthUser, "name" | "phone" | "location">>
+type ProfileUpdate = Partial<
+  Pick<
+    AuthUser,
+    "name" | "phone" | "location" | "avatarUrl" | "openPlayAnnouncementsEnabled"
+  >
+>
 
 type AuthContextValue = {
   user: AuthUser | null
@@ -71,9 +78,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: session.user.full_name,
         email: session.user.email,
         token: session.access_token,
-        phone: existing?.email === session.user.email ? existing.phone : undefined,
+        phone:
+          session.user.phone ??
+          (existing?.email === session.user.email ? existing.phone : undefined),
         location:
-          existing?.email === session.user.email ? existing.location : undefined,
+          session.user.location ??
+          (existing?.email === session.user.email ? existing.location : undefined),
+        avatarUrl:
+          session.user.avatar_url ??
+          (existing?.email === session.user.email ? existing.avatarUrl : undefined),
+        openPlayAnnouncementsEnabled:
+          session.user.open_play_announcements_enabled ??
+          (existing?.email === session.user.email
+            ? existing.openPlayAnnouncementsEnabled
+            : false),
         joinedAt:
           session.user.joined_at ??
           (existing?.email === session.user.email
@@ -93,6 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: session.user.full_name,
         email: session.user.email,
         token: session.access_token,
+        phone: session.user.phone ?? undefined,
+        location: session.user.location ?? undefined,
+        avatarUrl: session.user.avatar_url ?? undefined,
+        openPlayAnnouncementsEnabled:
+          session.user.open_play_announcements_enabled ?? false,
         joinedAt: session.user.joined_at ?? new Date().toISOString(),
       })
     },

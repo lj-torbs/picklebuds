@@ -2,6 +2,7 @@ import { LogIn, Menu, UserPlus } from "lucide-react"
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { buttonVariants } from "@/components/ui/button-variants"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 import {
   Sheet,
   SheetClose,
@@ -21,13 +22,7 @@ export function LandingNav() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center">
-            <img
-              src="/images/pikolbudyfinal.svg"
-              alt="PickleBuddy Logo"
-              className="h-10 w-10"
-            />
-          </div>
+          <PickleBuddyLogo className="size-10 shadow-sm" />
           <div className="leading-tight">
             <p className="text-lg font-bold tracking-tight">PickleBuddy</p>
             <p className="text-xs text-muted-foreground">

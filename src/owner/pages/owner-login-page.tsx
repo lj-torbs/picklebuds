@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { Building2, CalendarCheck, Eye, EyeOff, Lock, Mail } from "lucide-react"
+import { Building2, Eye, EyeOff, Lock, Mail } from "lucide-react"
 
 import { useOwnerAuth } from "@/owner/lib/owner-auth-context"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { sanitizeEmail } from "@/lib/validation"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 export function OwnerLoginPage() {
   const { login } = useOwnerAuth()
@@ -60,7 +61,12 @@ export function OwnerLoginPage() {
     }
 
     const state = location.state as { from?: { pathname?: string } } | null
-    navigate(state?.from?.pathname ?? "/owner/dashboard", { replace: true })
+    navigate(
+      result.owner.mustChangePassword
+        ? "/owner/change-password"
+        : (state?.from?.pathname ?? "/owner/dashboard"),
+      { replace: true }
+    )
   }
 
   return (
@@ -151,11 +157,14 @@ export function OwnerLoginPage() {
           </Button>
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            <CalendarCheck className="size-3.5" aria-hidden="true" />
             Back to player site
           </Link>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <PickleBuddyLogo className="size-4 rounded-sm" />
+            Powered by PickleBuddy
+          </span>
         </CardFooter>
       </Card>
     </main>

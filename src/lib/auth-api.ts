@@ -6,6 +6,11 @@ export type AuthApiUser = {
   full_name: string
   email: string
   role: AuthRole
+  phone?: string | null
+  location?: string | null
+  avatar_url?: string | null
+  open_play_announcements_enabled?: boolean
+  must_change_password?: boolean
   joined_at?: string | null
 }
 
@@ -21,6 +26,8 @@ export type AuthSignupResponse = AuthLoginResponse
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ??
   "http://127.0.0.1:8001/api"
+
+const API_ORIGIN = API_BASE_URL.replace(/\/api$/, "")
 
 export class AuthApiError extends Error {
   status: number
@@ -109,6 +116,149 @@ export async function signupWithApi(
   }
 
   return payload as AuthSignupResponse
+}
+
+export async function changePasswordWithApi(
+  token: string,
+  input: {
+    current_password: string
+    new_password: string
+  }
+) {
+  const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+
+  let payload: AuthApiUser | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to change password right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as AuthApiUser
+}
+
+export async function updatePlayerProfileWithApi(
+  token: string,
+  input: {
+    full_name: string
+    phone?: string | null
+    location?: string | null
+    open_play_announcements_enabled?: boolean
+  }
+) {
+  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+
+  let payload: AuthApiUser | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to update your profile right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as AuthApiUser
+}
+
+export async function uploadPlayerAvatarWithApi(token: string, file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const response = await fetch(`${API_BASE_URL}/auth/me/avatar`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  })
+
+  let payload: AuthApiUser | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to upload your profile photo right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as AuthApiUser
+}
+
+export async function deletePlayerAvatarWithApi(token: string) {
+  const response = await fetch(`${API_BASE_URL}/auth/me/avatar`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  let payload: AuthApiUser | { detail?: string } | null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      (payload && "detail" in payload && payload.detail) ||
+        "Unable to remove your profile photo right now.",
+      response.status,
+      undefined,
+      payload && "detail" in payload ? payload.detail : undefined
+    )
+  }
+
+  return payload as AuthApiUser
+}
+
+export function resolveApiMediaUrl(url?: string | null) {
+  if (!url) return ""
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url
+  }
+  if (url.startsWith("/")) return `${API_ORIGIN}${url}`
+  return `${API_ORIGIN}/${url}`
 }
 
 export function getAuthErrorMessage(error: unknown, fallback: string) {

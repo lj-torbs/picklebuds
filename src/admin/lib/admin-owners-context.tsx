@@ -3,6 +3,7 @@ import * as React from "react"
 
 import { useAdminAuth } from "@/admin/lib/admin-auth-context"
 import {
+  createAdminOwner,
   getAdminOwnerDetail,
   getAdminOwners,
   lockAdminOwner,
@@ -36,6 +37,7 @@ export type OwnerRecord = {
   systemFeeBillableCount: number
   systemShare: number
   ownerProfit: number
+  mustChangePassword: boolean
 }
 
 export type OwnerTransactionRecord = {
@@ -83,6 +85,13 @@ type AdminOwnersContextValue = {
   isLoading: boolean
   error: string | null
   refreshOwners: (filters?: { dateFrom?: string; dateTo?: string }) => Promise<void>
+  createOwner: (input: {
+    fullName: string
+    email: string
+    temporaryPassword: string
+    phone?: string
+    businessName?: string
+  }) => Promise<OwnerRecord>
   getOwnerDetail: (
     id: string,
     filters?: { dateFrom?: string; dateTo?: string }
@@ -119,6 +128,7 @@ function mapOwner(owner: AdminApiOwnerSummary): OwnerRecord {
     systemFeeBillableCount: owner.system_fee_billable_count,
     systemShare: owner.system_share,
     ownerProfit: owner.owner_total_profit,
+    mustChangePassword: Boolean(owner.must_change_password),
   }
 }
 
@@ -216,6 +226,29 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
       })
 
       return mapOwnerDetail(detail)
+    },
+    [admin]
+  )
+
+  const createOwner = React.useCallback(
+    async (input: {
+      fullName: string
+      email: string
+      temporaryPassword: string
+      phone?: string
+      businessName?: string
+    }) => {
+      if (!admin?.token) {
+        throw new Error("Admin session is required.")
+      }
+
+      const response = await createAdminOwner({
+        token: admin.token,
+        ...input,
+      })
+      const owner = mapOwner(response)
+      setOwners((current) => [owner, ...current])
+      return owner
     },
     [admin]
   )
@@ -334,6 +367,7 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
       isLoading,
       error,
       refreshOwners,
+      createOwner,
       getOwnerDetail,
       setOwnerStatus,
       setSystemPaymentStatus,
@@ -346,6 +380,7 @@ export function AdminOwnersProvider({ children }: { children: React.ReactNode })
       isLoading,
       error,
       refreshOwners,
+      createOwner,
       getOwnerDetail,
       setOwnerStatus,
       setSystemPaymentStatus,

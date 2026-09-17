@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { CalendarCheck, Eye, EyeOff, Mail, UserRound } from "lucide-react"
+import { Eye, EyeOff, Mail, UserRound } from "lucide-react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import type { z } from "zod"
 
@@ -23,6 +23,7 @@ import {
   sanitizeText,
   signupSchema,
 } from "@/lib/validation"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 type AuthMode = "login" | "signup"
 
@@ -252,9 +253,7 @@ export function AuthCard({ mode }: AuthCardProps) {
         <div className="relative z-10 flex w-full flex-col justify-between p-10">
           {/* Logo */}
           <Link to="/" className="flex w-fit items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-lg">
-              <CalendarCheck className="h-5 w-5 text-white" />
-            </div>
+            <PickleBuddyLogo className="h-11 w-11 border-white/15 bg-white/95 shadow-lg ring-white/20" />
 
             <div>
               <h2 className="text-lg font-bold tracking-wide text-white">
@@ -304,6 +303,7 @@ export function AuthCard({ mode }: AuthCardProps) {
       <section className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
         <Card className="w-full max-w-md rounded-lg">
           <CardHeader className="text-center">
+            <PickleBuddyLogo className="mx-auto mb-2 size-14 shadow-sm" />
             <CardTitle className="text-xl">{copy.title}</CardTitle>
             <CardDescription>{copy.description}</CardDescription>
           </CardHeader>
@@ -507,7 +507,7 @@ export function AuthCard({ mode }: AuthCardProps) {
               className="w-full"
               type="button"
               disabled
-              title="Google sign-in isn't available in this preview build yet"
+              title="Google sign-in is currently unavailable"
             >
               Continue with Google
             </Button>

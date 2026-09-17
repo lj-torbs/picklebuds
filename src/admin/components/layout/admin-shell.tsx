@@ -12,6 +12,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 const pageTitles: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
@@ -75,7 +76,10 @@ export function AdminShell() {
             </SheetContent>
           </Sheet>
 
-          <h1 className="text-lg font-semibold">{title}</h1>
+          <div className="flex min-w-0 items-center gap-3">
+            <PickleBuddyLogo className="size-9 shadow-xs lg:hidden" />
+            <h1 className="truncate text-lg font-semibold">{title}</h1>
+          </div>
 
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">

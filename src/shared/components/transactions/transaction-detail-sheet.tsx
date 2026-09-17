@@ -163,7 +163,7 @@ export function TransactionDetailSheet({
                   <p>
                     Review the payment method, reference number, sender name,
                     and uploaded receipt before approval. Approval is a manual
-                    owner judgment call in this prototype.
+                    owner decision based on the submitted payment proof.
                   </p>
                 </div>
               </div>

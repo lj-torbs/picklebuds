@@ -2,7 +2,6 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import {
   BadgeDollarSign,
-  CalendarCheck,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -39,6 +38,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useBookings } from "@/lib/bookings-context"
 import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
 import { getRentalTotal } from "@/shared/lib/gyms-context"
 
@@ -244,9 +244,7 @@ export function MyBookingsPage() {
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/booking" className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <CalendarCheck className="size-5" aria-hidden="true" />
-            </span>
+            <PickleBuddyLogo className="size-10 shadow-sm" />
             <span>
               <span className="block text-base leading-tight font-bold">
                 PickleBuddy

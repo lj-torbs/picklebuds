@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
   ArrowRight,
-  Building2,
   CalendarCheck,
   MapPin,
   Search,
@@ -20,6 +19,7 @@ import {
 } from "@/owner/lib/owner-branding-context"
 import { GymPhoto } from "@/shared/components/gyms/gym-photo"
 import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 function venueMatchesQuery(
   venue: PublicOwnerBookingApiResponse["venues"][number],
@@ -284,7 +284,7 @@ export function OwnerPublicBookingPage() {
         )}
 
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <Building2 className="size-3.5" aria-hidden="true" />
+          <PickleBuddyLogo className="size-5 rounded-sm shadow-xs" />
           <span>Powered by PickleBuddy</span>
         </div>
       </section>

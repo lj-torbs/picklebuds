@@ -63,6 +63,7 @@ import {
   CourtStatusBadge,
   GymStatusBadge,
 } from "@/shared/components/gyms/gym-status-badge"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
 import {
   buildOwnerBrandingStyle,
@@ -361,7 +362,7 @@ export function GymDetailPage() {
         setLiveVenueError(
           getAuthErrorMessage(
             error,
-            "Unable to load live venue details. Showing sample data instead."
+            "Unable to load this venue right now. Please refresh the page or try again later."
           )
         )
       })
@@ -694,7 +695,7 @@ export function GymDetailPage() {
       if (!user?.token) {
         toast.add({
           title: "Sign in required",
-          description: "Please sign in again before submitting a live booking.",
+          description: "Please sign in again before submitting your booking.",
           type: "error",
         })
         return
@@ -807,7 +808,7 @@ export function GymDetailPage() {
       if (!user?.token) {
         toast.add({
           title: "Sign in required",
-          description: "Please sign in again before submitting a live booking.",
+          description: "Please sign in again before submitting your booking.",
           type: "error",
         })
         return
@@ -1017,9 +1018,13 @@ export function GymDetailPage() {
       <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to={bookingHomeHref} className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <CalendarCheck className="size-5" aria-hidden="true" />
-            </span>
+            {ownerSlug ? (
+              <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <CalendarCheck className="size-5" aria-hidden="true" />
+              </span>
+            ) : (
+              <PickleBuddyLogo className="size-10 shadow-sm" />
+            )}
             <span>
               <span className="block text-base leading-tight font-bold">
                 {bookingHeaderLabel}

@@ -1,5 +1,4 @@
 import {
-  CalendarCheck,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -9,6 +8,7 @@ import {
 import { NavLink } from "react-router-dom"
 
 import { cn } from "@/lib/utils"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 const navItems = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -39,9 +39,7 @@ export function AdminSidebar({
             collapsed && "hidden"
           )}
         >
-          <span className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-            <CalendarCheck className="size-5" aria-hidden="true" />
-          </span>
+          <PickleBuddyLogo className="size-10 bg-sidebar-accent ring-sidebar-border" />
           {!collapsed ? (
             <span className="min-w-0">
               <span className="block truncate text-base leading-tight font-bold">

@@ -2,6 +2,7 @@ import { Bell } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { buttonVariants } from "@/components/ui/button-variants"
+import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import { useNotifications } from "@/shared/lib/use-notifications"
 
@@ -14,7 +15,18 @@ export function NotificationBellLink({
   to: string
   className?: string
 }) {
-  const { unreadCount } = useNotifications({ token, intervalMs: 30000 })
+  const toast = useToast()
+  const { unreadCount } = useNotifications({
+    token,
+    intervalMs: 10000,
+    onNewUnread: (notification) => {
+      toast.add({
+        title: notification.title,
+        description: notification.message,
+        type: "success",
+      })
+    },
+  })
 
   return (
     <Link

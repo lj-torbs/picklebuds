@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
-import { AuthApiError, loginWithApi } from "@/lib/auth-api"
+import { AuthApiError, changePasswordWithApi, loginWithApi } from "@/lib/auth-api"
 import { persistStorageItem, readStorageItem } from "@/lib/auth-storage"
 
 type OwnerUser = {
@@ -9,6 +9,7 @@ type OwnerUser = {
   name: string
   email: string
   token?: string
+  mustChangePassword?: boolean
 }
 
 type OwnerLoginInput = {
@@ -31,6 +32,10 @@ type OwnerLoginResult =
 type OwnerAuthContextValue = {
   owner: OwnerUser | null
   login: (input: OwnerLoginInput) => Promise<OwnerLoginResult>
+  changePassword: (input: {
+    currentPassword: string
+    newPassword: string
+  }) => Promise<OwnerUser>
   logout: () => void
 }
 
@@ -71,6 +76,7 @@ export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
           name: session.user.full_name,
           email: session.user.email,
           token: session.access_token,
+          mustChangePassword: Boolean(session.user.must_change_password),
         }
 
         persistOwner(resolvedOwner)
@@ -97,9 +103,31 @@ export function OwnerAuthProvider({ children }: { children: React.ReactNode }) {
     persistOwner(null)
   }, [persistOwner])
 
+  const changePassword = React.useCallback(
+    async (input: { currentPassword: string; newPassword: string }) => {
+      if (!owner?.token) {
+        throw new Error("Owner session is required.")
+      }
+
+      const updatedUser = await changePasswordWithApi(owner.token, {
+        current_password: input.currentPassword,
+        new_password: input.newPassword,
+      })
+      const nextOwner = {
+        ...owner,
+        name: updatedUser.full_name,
+        email: updatedUser.email,
+        mustChangePassword: Boolean(updatedUser.must_change_password),
+      }
+      persistOwner(nextOwner)
+      return nextOwner
+    },
+    [owner, persistOwner]
+  )
+
   const value = React.useMemo(
-    () => ({ owner, login, logout }),
-    [owner, login, logout]
+    () => ({ owner, login, changePassword, logout }),
+    [owner, login, changePassword, logout]
   )
 
   return (

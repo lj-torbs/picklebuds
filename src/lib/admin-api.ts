@@ -18,6 +18,7 @@ export type AdminApiOwnerSummary = {
   system_fee_billable_count: number
   system_share: number
   owner_total_profit: number
+  must_change_password?: boolean
 }
 
 export type AdminApiOwnerTransaction = {
@@ -121,6 +122,32 @@ export async function getAdminOwners(input: {
   return parseResponse<{ items: AdminApiOwnerSummary[] }>(
     response,
     "Unable to load owners."
+  )
+}
+
+export async function createAdminOwner(input: {
+  token: string
+  fullName: string
+  email: string
+  temporaryPassword: string
+  phone?: string
+  businessName?: string
+}) {
+  const response = await fetch(`${API_BASE_URL}/admin/owners`, {
+    method: "POST",
+    headers: buildHeaders(input.token),
+    body: JSON.stringify({
+      full_name: input.fullName,
+      email: input.email,
+      temporary_password: input.temporaryPassword,
+      phone: input.phone || null,
+      business_name: input.businessName || null,
+    }),
+  })
+
+  return parseResponse<AdminApiOwnerSummary>(
+    response,
+    "Unable to create owner account."
   )
 }
 

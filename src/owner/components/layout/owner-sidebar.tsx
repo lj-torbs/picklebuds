@@ -8,16 +8,19 @@ import {
   PanelLeftOpen,
   Receipt,
   Settings2,
+  Trophy,
 } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
 import { cn } from "@/lib/utils"
 import { useOwnerBranding } from "@/owner/lib/owner-branding-context"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 export const ownerNavItems = [
   { to: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/owner/gyms", label: "My Gyms", icon: Building2 },
   { to: "/owner/payment-methods", label: "Payment Methods", icon: CreditCard },
+  { to: "/owner/tournaments", label: "Tournaments", icon: Trophy },
   { to: "/owner/transactions", label: "Transactions", icon: Receipt },
   { to: "/owner/notifications", label: "Notifications", icon: Bell },
   { to: "/owner/configuration", label: "Configuration", icon: Settings2 },
@@ -157,14 +160,17 @@ export function OwnerSidebar({
 
       <div
         className={cn(
-          "mt-auto rounded-md border border-sidebar-border/70 px-3 py-2 text-[11px] text-sidebar-foreground/55",
+          "mt-auto flex items-center gap-2 rounded-md border border-sidebar-border/70 px-3 py-2 text-[11px] text-sidebar-foreground/55",
           collapsed && "sr-only"
         )}
       >
-        <span className="block font-medium text-sidebar-foreground/70">
-          Powered by PickleBuddy
+        <PickleBuddyLogo className="size-6 rounded-sm bg-sidebar-accent ring-sidebar-border" />
+        <span className="min-w-0">
+          <span className="block truncate font-medium text-sidebar-foreground/70">
+            Powered by PickleBuddy
+          </span>
+          <span className="mt-0.5 block truncate">White-label venue operations</span>
         </span>
-        <span className="mt-0.5 block">White-label venue operations</span>
       </div>
     </div>
   )

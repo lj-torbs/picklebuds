@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { CalendarCheck, Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, Lock, Mail } from "lucide-react"
 
 import { useAdminAuth } from "@/admin/lib/admin-auth-context"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getAuthErrorMessage } from "@/lib/auth-api"
 import { sanitizeEmail } from "@/lib/validation"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 export function AdminLoginPage() {
   const { login } = useAdminAuth()
@@ -67,9 +68,7 @@ export function AdminLoginPage() {
     <main className="flex min-h-svh items-center justify-center bg-sidebar px-4 py-10">
       <Card className="w-full max-w-sm rounded-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <ShieldCheck className="size-6" aria-hidden="true" />
-          </div>
+          <PickleBuddyLogo className="mx-auto size-14 shadow-sm" />
           <CardTitle className="text-xl">Admin sign in</CardTitle>
           <CardDescription>
             Manage transactions, bookings, and platform activity.
@@ -153,7 +152,7 @@ export function AdminLoginPage() {
             to="/"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            <CalendarCheck className="size-3.5" aria-hidden="true" />
+            <PickleBuddyLogo className="size-4 rounded-sm" />
             Back to player site
           </Link>
         </CardFooter>

@@ -3,12 +3,10 @@ import { Link, useSearchParams } from "react-router-dom"
 import {
   ArrowRight,
   Building2,
-  CalendarCheck,
   Clock3,
   MapPin,
   Search,
   Star,
-  UserRound,
 } from "lucide-react"
 
 import { buttonVariants } from "@/components/ui/button-variants"
@@ -17,6 +15,7 @@ import { GymPhoto } from "@/shared/components/gyms/gym-photo"
 import { GymStatusBadge } from "@/shared/components/gyms/gym-status-badge"
 import { OpenPlayPanel } from "@/shared/components/player/open-play-panel"
 import { PasaloPanel } from "@/shared/components/player/pasalo-panel"
+import { PlayerHeader } from "@/shared/components/player/player-header"
 import { PlayerModeStrip } from "@/shared/components/player/player-mode-strip"
 import {
   getVenueDetailWithApi,
@@ -25,7 +24,6 @@ import {
 } from "@/lib/booking-api"
 import { useAuth } from "@/lib/auth-context"
 import { formatCurrency, pesoSymbol } from "@/lib/currency"
-import { NotificationBellLink } from "@/shared/components/notifications/notification-bell-link"
 import { mapOwnerBrandingApiToConfig } from "@/owner/lib/owner-branding-context"
 import type { Court, Gym } from "@/shared/lib/gyms-context"
 import { useGyms } from "@/shared/lib/gyms-context"
@@ -277,39 +275,7 @@ export function BookingPage() {
 
   return (
     <main className="min-h-svh bg-muted/30">
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/booking" className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <CalendarCheck className="size-5" aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block text-base leading-tight font-bold">
-                PickleBuddy
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                Client booking
-              </span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <NotificationBellLink token={user?.token} to="/notifications" />
-            <Link
-              to="/profile"
-              className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-              aria-label="Profile"
-            >
-              <UserRound className="size-4" aria-hidden="true" />
-            </Link>
-            <Link
-              to="/my-bookings"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              My bookings
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PlayerHeader token={user?.token} />
 
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <PlayerModeStrip current={mode} />

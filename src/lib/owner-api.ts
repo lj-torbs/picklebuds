@@ -126,6 +126,77 @@ export type OwnerVenueApiResponse = {
   }>
 }
 
+export type OwnerTournamentStageFormat =
+  | "knockout"
+  | "double_elimination"
+  | "round_robin"
+  | "swiss"
+
+export type OwnerTournamentStageMode = "single" | "multi"
+export type OwnerTournamentStatus = "draft" | "ready" | "running" | "completed"
+
+export type OwnerTournamentStageApiItem = {
+  id: string
+  name: string
+  format: OwnerTournamentStageFormat
+  bracket_size: number
+  rounds_to_play: number
+  advance_count: number
+  sort_order: number
+}
+
+export type OwnerTournamentParticipantApiItem = {
+  id: string
+  name: string
+  rating: number
+  division: string
+  seed_order: number
+}
+
+export type OwnerTournamentMatchSlotApiItem = {
+  participant_id: string | null
+  name: string
+  seed: number | null
+  rating: number | null
+  source: string | null
+}
+
+export type OwnerTournamentMatchApiItem = {
+  id: string
+  stage_id: string
+  round_index: number
+  match_index: number
+  title: string
+  court: string
+  scheduled_at: string
+  a: OwnerTournamentMatchSlotApiItem
+  b: OwnerTournamentMatchSlotApiItem
+  winner_participant_id: string | null
+  notes: string | null
+}
+
+export type OwnerTournamentApiItem = {
+  public_id: string
+  name: string
+  division: string
+  event_date: string | null
+  start_time: string
+  stage_mode: OwnerTournamentStageMode
+  status: OwnerTournamentStatus
+  stages: OwnerTournamentStageApiItem[]
+  participants: OwnerTournamentParticipantApiItem[]
+  matches: OwnerTournamentMatchApiItem[]
+  created_at: string
+  updated_at: string
+}
+
+export type OwnerTournamentSaveInput = Omit<
+  OwnerTournamentApiItem,
+  "public_id" | "created_at" | "updated_at"
+> & {
+  public_id?: string | null
+}
+
 async function parseApiResponse<T>(response: Response, fallback: string) {
   let payload: T | { detail?: string } | null
   try {
@@ -181,6 +252,36 @@ export async function getOwnerTransactionsWithApi(token: string) {
   }>(
     response,
     "Unable to load owner transactions right now."
+  )
+}
+
+export async function getOwnerTournamentsWithApi(token: string) {
+  const response = await fetch(`${API_BASE_URL}/owners/tournaments`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  return parseApiResponse<{ items: OwnerTournamentApiItem[] }>(
+    response,
+    "Unable to load owner tournaments right now."
+  )
+}
+
+export async function saveOwnerTournamentWithApi(
+  token: string,
+  input: OwnerTournamentSaveInput
+) {
+  const response = await fetch(`${API_BASE_URL}/owners/tournaments`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  })
+
+  return parseApiResponse<OwnerTournamentApiItem>(
+    response,
+    "Unable to save tournament right now."
   )
 }
 

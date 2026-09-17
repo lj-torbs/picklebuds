@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search } from "lucide-react"
+import { KeyRound, Search, UserPlus } from "lucide-react"
 
 import { OwnerStatusBadge } from "@/admin/components/owners/owner-status-badge"
 import type {
@@ -15,8 +15,17 @@ import { useToast } from "@/components/ui/toast"
 import { formatCurrency } from "@/lib/currency"
 import { cn } from "@/lib/utils"
 import { useAdminAuth } from "@/admin/lib/admin-auth-context"
+import { sanitizeEmail, sanitizeText } from "@/lib/validation"
 const quickFilters = ["all", "paid", "unpaid", "suspended"] as const
 type QuickFilter = (typeof quickFilters)[number]
+
+const createOwnerInitialState = {
+  fullName: "",
+  email: "",
+  phone: "",
+  businessName: "",
+  temporaryPassword: "",
+}
 
 function ownerMatchesQuery(owner: OwnerRecord, query: string) {
   const normalizedQuery = query.trim().toLowerCase()
@@ -56,6 +65,7 @@ export function AdminOwnersPage() {
     isLoading,
     error,
     refreshOwners,
+    createOwner,
     setSystemPaymentStatus,
     setOwnerSystemFee,
     lockOwnerUntilPaid,
@@ -72,6 +82,14 @@ export function AdminOwnersPage() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [feeDrafts, setFeeDrafts] = useState<Record<string, string>>({})
+  const [showCreateOwner, setShowCreateOwner] = useState(false)
+  const [createOwnerDraft, setCreateOwnerDraft] = useState(createOwnerInitialState)
+  const [createdOwnerCredentials, setCreatedOwnerCredentials] = useState<{
+    name: string
+    email: string
+    temporaryPassword: string
+  } | null>(null)
+  const [isCreatingOwner, setIsCreatingOwner] = useState(false)
   const [submittingFeeOwnerId, setSubmittingFeeOwnerId] = useState<string | null>(
     null
   )
@@ -101,6 +119,84 @@ export function AdminOwnersPage() {
 
   function getFeeDraft(owner: OwnerRecord) {
     return feeDrafts[owner.id] ?? String(owner.systemFeePerTransaction)
+  }
+
+  function generateTemporaryPassword() {
+    const letters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    const digits = "23456789"
+    const symbols = "!@#%"
+    const all = `${letters}${digits}${symbols}`
+    const values = new Uint32Array(12)
+    window.crypto.getRandomValues(values)
+    const password = [
+      letters[values[0] % letters.length],
+      digits[values[1] % digits.length],
+      symbols[values[2] % symbols.length],
+      ...Array.from(values.slice(3), (value) => all[value % all.length]),
+    ].join("")
+    setCreateOwnerDraft((current) => ({
+      ...current,
+      temporaryPassword: password,
+    }))
+  }
+
+  async function handleCreateOwner(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const fullName = sanitizeText(createOwnerDraft.fullName)
+    const email = sanitizeEmail(createOwnerDraft.email)
+    const phone = sanitizeText(createOwnerDraft.phone)
+    const businessName = sanitizeText(createOwnerDraft.businessName)
+    const temporaryPassword = createOwnerDraft.temporaryPassword.trim()
+
+    if (!fullName || !email || !temporaryPassword) {
+      toast.add({
+        title: "Owner details incomplete",
+        description: "Owner name, email, and temporary password are required.",
+        type: "error",
+      })
+      return
+    }
+    if (temporaryPassword.length < 8 || !/[A-Za-z]/.test(temporaryPassword) || !/\d/.test(temporaryPassword)) {
+      toast.add({
+        title: "Temporary password is weak",
+        description: "Use at least 8 characters with a letter and a number.",
+        type: "error",
+      })
+      return
+    }
+
+    setIsCreatingOwner(true)
+    try {
+      const owner = await createOwner({
+        fullName,
+        email,
+        phone,
+        businessName,
+        temporaryPassword,
+      })
+      toast.add({
+        title: "Owner account created",
+        description: `${owner.name} must change the temporary password on first login.`,
+        type: "success",
+      })
+      setCreatedOwnerCredentials({
+        name: owner.name,
+        email: owner.email,
+        temporaryPassword,
+      })
+      setCreateOwnerDraft(createOwnerInitialState)
+      setShowCreateOwner(false)
+      await refreshOwners({ dateFrom, dateTo })
+    } catch (error) {
+      toast.add({
+        title: "Unable to create owner",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        type: "error",
+      })
+    } finally {
+      setIsCreatingOwner(false)
+    }
   }
 
   async function handleSystemPaymentStatus(
@@ -208,7 +304,173 @@ export function AdminOwnersPage() {
             Track owner settlements, filter revenue by date range, and lock access when the system share has not been paid yet.
           </p>
         </div>
+        <Button
+          type="button"
+          className="w-fit gap-2"
+          onClick={() => setShowCreateOwner((current) => !current)}
+        >
+          <UserPlus className="size-4" aria-hidden="true" />
+          {showCreateOwner ? "Close" : "Create owner"}
+        </Button>
       </div>
+
+      {showCreateOwner ? (
+        <form
+          className="grid gap-4 rounded-lg border bg-card p-4"
+          onSubmit={handleCreateOwner}
+        >
+          <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
+            <div>
+              <h3 className="text-base font-semibold">New owner account</h3>
+              <p className="text-sm text-muted-foreground">
+                Admin-created owners receive a temporary password and must change it before using the owner console.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-fit gap-2"
+              onClick={generateTemporaryPassword}
+            >
+              <KeyRound className="size-4" aria-hidden="true" />
+              Generate password
+            </Button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-1.5 xl:col-span-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="owner-full-name">
+                Owner name
+              </label>
+              <Input
+                id="owner-full-name"
+                value={createOwnerDraft.fullName}
+                onChange={(event) =>
+                  setCreateOwnerDraft((current) => ({
+                    ...current,
+                    fullName: event.target.value,
+                  }))
+                }
+                placeholder="Owner name"
+                required
+              />
+            </div>
+            <div className="grid gap-1.5 xl:col-span-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="owner-email">
+                Email
+              </label>
+              <Input
+                id="owner-email"
+                type="email"
+                value={createOwnerDraft.email}
+                onChange={(event) =>
+                  setCreateOwnerDraft((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+                placeholder="owner@gym.com"
+                required
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="owner-business">
+                Business name
+              </label>
+              <Input
+                id="owner-business"
+                value={createOwnerDraft.businessName}
+                onChange={(event) =>
+                  setCreateOwnerDraft((current) => ({
+                    ...current,
+                    businessName: event.target.value,
+                  }))
+                }
+                placeholder="Gym name"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="owner-phone">
+                Phone
+              </label>
+              <Input
+                id="owner-phone"
+                value={createOwnerDraft.phone}
+                onChange={(event) =>
+                  setCreateOwnerDraft((current) => ({
+                    ...current,
+                    phone: event.target.value,
+                  }))
+                }
+                placeholder="Optional"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="owner-temp-password">
+                Temporary password
+              </label>
+              <Input
+                id="owner-temp-password"
+                value={createOwnerDraft.temporaryPassword}
+                onChange={(event) =>
+                  setCreateOwnerDraft((current) => ({
+                    ...current,
+                    temporaryPassword: event.target.value,
+                  }))
+                }
+                placeholder="Temporary password"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setCreateOwnerDraft(createOwnerInitialState)
+                setShowCreateOwner(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreatingOwner}>
+              {isCreatingOwner ? "Creating..." : "Create owner"}
+            </Button>
+          </div>
+        </form>
+      ) : null}
+
+      {createdOwnerCredentials ? (
+        <div className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <h3 className="text-sm font-semibold">Owner login details ready</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Share these details with {createdOwnerCredentials.name}. They will be required to set a new password before accessing the owner console.
+            </p>
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+              <div className="rounded-md bg-background px-3 py-2">
+                <span className="block text-xs text-muted-foreground">Email</span>
+                <span className="font-medium">{createdOwnerCredentials.email}</span>
+              </div>
+              <div className="rounded-md bg-background px-3 py-2">
+                <span className="block text-xs text-muted-foreground">Temporary password</span>
+                <span className="font-mono font-medium">
+                  {createdOwnerCredentials.temporaryPassword}
+                </span>
+              </div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCreatedOwnerCredentials(null)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 rounded-lg border bg-card p-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.5fr)_200px_280px]">
@@ -313,6 +575,11 @@ export function AdminOwnersPage() {
                       <div className="text-xs text-muted-foreground">
                         {owner.email}
                       </div>
+                      {owner.mustChangePassword ? (
+                        <div className="mt-1 inline-flex items-center rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Password reset required
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {owner.joinedAt ? owner.joinedAt.slice(0, 10) : "--"}

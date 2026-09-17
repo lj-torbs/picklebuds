@@ -22,14 +22,14 @@ export function createMockPaymentReceipt({
   uploadedAt: string
 }): PaymentReceipt {
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1280" role="img" aria-label="Prototype payment receipt">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1280" role="img" aria-label="Payment receipt">
       <rect width="720" height="1280" fill="#f3f4f6"/>
       <rect x="48" y="48" width="624" height="1184" rx="28" fill="#ffffff"/>
       <text x="96" y="126" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#111827">
-        Prototype Payment Receipt
+        Payment Receipt
       </text>
       <text x="96" y="168" font-family="Arial, sans-serif" font-size="20" fill="#6b7280">
-        For UI demonstration only
+        Uploaded by customer
       </text>
       <rect x="96" y="220" width="528" height="2" fill="#e5e7eb"/>
       <text x="96" y="292" font-family="Arial, sans-serif" font-size="20" fill="#6b7280">Venue</text>
@@ -47,7 +47,7 @@ export function createMockPaymentReceipt({
         PAYMENT PROOF
       </text>
       <text x="360" y="1016" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#d1d5db">
-        Simulated screenshot for prototype review
+        Uploaded payment screenshot
       </text>
     </svg>
   `
@@ -55,7 +55,7 @@ export function createMockPaymentReceipt({
   return {
     referenceNumber,
     accountName,
-    fileName: `${venue.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-prototype-receipt.png`,
+    fileName: `${venue.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-payment-receipt.png`,
     imageUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
     uploadedAt,
   }

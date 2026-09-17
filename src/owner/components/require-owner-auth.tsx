@@ -12,6 +12,19 @@ export function RequireOwnerAuth() {
     return <Navigate to="/owner/login" replace state={{ from: location }} />
   }
 
+  if (
+    owner.mustChangePassword &&
+    location.pathname !== "/owner/change-password"
+  ) {
+    return (
+      <Navigate
+        to="/owner/change-password"
+        replace
+        state={{ from: location }}
+      />
+    )
+  }
+
   const currentOwner = owners.find((record) => record.id === owner.id)
   if (currentOwner?.status === "suspended") {
     return (

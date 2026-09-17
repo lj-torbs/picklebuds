@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import { useNotifications } from "@/shared/lib/use-notifications"
+import { PickleBuddyLogo } from "@/shared/components/brand/picklebuddy-logo"
 
 export function OwnerShell() {
   const { owner, logout } = useOwnerAuth()
@@ -169,8 +170,9 @@ export function OwnerShell() {
           <Outlet />
         </main>
 
-        <footer className="border-t bg-background/90 px-4 py-3 text-xs text-muted-foreground sm:px-6">
-          Powered by PickleBuddy
+        <footer className="flex items-center gap-2 border-t bg-background/90 px-4 py-3 text-xs text-muted-foreground sm:px-6">
+          <PickleBuddyLogo className="size-5 rounded-sm shadow-xs" />
+          <span>Powered by PickleBuddy</span>
         </footer>
       </div>
     </div>

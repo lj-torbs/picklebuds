@@ -18,6 +18,11 @@ export type NotificationApiItem = {
   created_at: string
 }
 
+export type OpenPlayAnnouncementResponse = {
+  notified_count: number
+  message: string
+}
+
 async function parseApiResponse<T>(response: Response, fallback: string) {
   let payload: T | { detail?: string } | null
   try {
@@ -70,5 +75,34 @@ export async function markNotificationReadWithApi(
   return parseApiResponse<NotificationApiItem>(
     response,
     "Unable to update this notification right now."
+  )
+}
+
+export async function announceOpenPlayWithApi(
+  token: string,
+  input: {
+    venuePublicId: string
+    courtPublicId: string
+    bookingDate: string
+    slotLabel: string
+  }
+) {
+  const response = await fetch(`${API_BASE_URL}/notifications/open-play/announce`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      venue_public_id: input.venuePublicId,
+      court_public_id: input.courtPublicId,
+      booking_date: input.bookingDate,
+      slot_label: input.slotLabel,
+    }),
+  })
+
+  return parseApiResponse<OpenPlayAnnouncementResponse>(
+    response,
+    "Unable to announce this Open Play session right now."
   )
 }
